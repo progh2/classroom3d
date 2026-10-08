@@ -451,74 +451,88 @@ export function buildRoom(scene, screenTex) {
       const px_ = sock(0); bt.aabb(M.plug, px_ - 0.022, px_ + 0.022, 0.452, 0.498, sz2, sz2 + 0.03);
       bt.tube(M.cable, [[px_, 0.46, sz2 + 0.03], [px_ + 0.01, 0.38, sz2 + 0.05], [px_ + 0.04, 0.33, sz2 + 0.03]], 0.0022);
     }
+    // ── 앞 가림판 (t1009): 상판 앞(북쪽) 끝, 상판 위로 9 cm, 책상 폭 전체, 상판과 같은 흰색 + 연회색 윗마구리 ──
+    const PART_H = 0.09, PART_T = 0.012;
+    bt.aabb(M.deskTop, d.x1, d.x2, DESK_H, DESK_H + PART_H - 0.004, d.z1, d.z1 + PART_T);
+    bt.aabb(M.edge, d.x1, d.x2, DESK_H + PART_H - 0.004, DESK_H + PART_H, d.z1 - 0.001, d.z1 + PART_T + 0.001);
     // ── Dell 27" 모니터 + 검정 폴형 싱글 암 (북서 모서리 C-클램프, 폴 ~45 cm) + 미니PC (VESA 판 옆, 같은 높이) ──
-    //   정정(t1007): 모니터 아래 끝이 상판 위 8 cm. 일반 수업 모드에서는 폴(축)을 중심으로 왼쪽으로 돌림 →
-    //   암 A(폴 기준 회전) 그룹 + 팔꿈치 관절 기준 B 그룹(모니터·VESA·미니PC·케이블)으로 나눠 움직임
-    const mY = DESK_H + 0.08 + 0.1825, mz = d.z1 + 0.19;   // 화면 중심 높이, 화면 앞면 z
+    //   정정(t1009): 모니터 아래 베젤이 상판 위 약 2 cm(2.3 cm — 키보드 뒤 끝 높이 2.2 cm·폴 밑동 케이블 바로 위).
+    //   실제 암처럼 폴 칼라를 폴 따라 아래로 내려(8 cm → 2.3 cm, 5.7 cm) 암·VESA 판·미니PC·브래킷·케이블이 그대로 함께 내려감.
+    //   관절 3개: 폴 칼라(A, 긴 첫 마디 27.6 cm — 팔꿈치는 VESA 브래킷 바로 뒤) → 팔꿈치(B, 짧은 둘째 마디) → VESA 스위블(C, 모니터 머리).
+    //   일반 수업 모드: A -92°(폴 기준 왼쪽·남쪽으로) + B +132° + 스위블 +40° → 모니터가 책상 왼쪽 가장자리를 따라 서고
+    //   화면은 안쪽(책상 가운데·학생 쪽, 동쪽에서 남쪽으로 10°)을, 미니PC가 붙은 뒷면은 바깥(창 쪽)을 향함
+    const MON_GAP = 0.023;   // 베젤 아래 끝 ~ 상판 윗면
+    const mY = DESK_H + MON_GAP + 0.1825, mz = d.z1 + 0.19;   // 화면 중심 높이, 화면 앞면 z
     const back = mz - 0.03;
     const vy = mY - 0.045, vx = cx - 0.045, px = cx + 0.055;
     const ax = d.x1 + 0.04, az = d.z1 + 0.035, ay = vy, vz = back - 0.09;
-    const jx = ax + (vx - ax) * 0.55, jz = az;
-    const bA = new Batcher(vcMat), bB = new Batcher(vcMat);
-    bB.aabb(M.black, cx - 0.3075, cx + 0.3075, mY - 0.1825, mY + 0.1825, back, mz);
-    bB.aabb(M.black, cx - 0.2, cx + 0.2, mY - 0.13, mY + 0.11, back - 0.018, back);           // 뒷면 볼록부
-    bB.plane(M.dellBack, 0.06, 0.06, cx, mY + 0.06, back - 0.0185, Math.PI);                   // DELL 로고 (뒷면 중앙)
+    const jx = d.x1 + 0.316, jz = az;   // 팔꿈치: VESA 브래킷 바로 뒤(모니터 뒤에 숨음)
+    const sz = back - 0.062;            // VESA 스위블 축 (x = vx)
+    const bA = new Batcher(vcMat), bB = new Batcher(vcMat), bC = new Batcher(vcMat);
+    bC.aabb(M.black, cx - 0.3075, cx + 0.3075, mY - 0.1825, mY + 0.1825, back, mz);
+    bC.aabb(M.black, cx - 0.2, cx + 0.2, mY - 0.13, mY + 0.11, back - 0.018, back);           // 뒷면 볼록부
+    bC.plane(M.dellBack, 0.06, 0.06, cx, mY + 0.06, back - 0.0185, Math.PI);                   // DELL 로고 (뒷면 중앙)
     // 참고 사진(ref/minipc_vesa_ref.png): 뒤에서 볼 때 미니PC는 가운데 왼쪽(동쪽), 은색 VESA 판 + 틸트 브래킷은 가운데 오른쪽(서쪽, 폴 쪽), 같은 높이
-    bB.aabb(M.silver, vx - 0.055, vx + 0.055, vy - 0.055, vy + 0.055, back - 0.023, back - 0.018);
-    bB.aabb(M.silver, vx - 0.075, vx - 0.055, vy - 0.012, vy + 0.012, back - 0.022, back - 0.018);
-    bB.aabb(M.silver, vx + 0.055, vx + 0.07, vy - 0.012, vy + 0.012, back - 0.022, back - 0.018);
-    for (const [sx, sy] of [[-0.045, -0.045], [-0.045, 0.045], [0.045, -0.045], [0.045, 0.045]]) bB.cyl(M.steelDark, 0.005, 0.006, vx + sx, vy + sy, back - 0.025, 6, Math.PI / 2);
-    bB.aabb(M.silver, px - 0.0625, px + 0.0625, vy - 0.0625, vy + 0.0625, back - 0.064, back - 0.024); // 미니PC 알루미늄 테두리
-    bB.plane(M.pcFace, 0.115, 0.115, px, vy, back - 0.0645, Math.PI);
-    for (const [sy, h] of [[0.03, 0.012], [0.017, 0.008], [0.005, 0.008], [-0.012, 0.008], [-0.035, 0.014]]) bB.aabb(M.black, px + 0.0625, px + 0.064, vy + sy - h / 2, vy + sy + h / 2, back - 0.052, back - 0.036);
-    bB.tube(M.cable, [[px + 0.065, vy + 0.03, back - 0.044], [px + 0.082, vy + 0.02, back - 0.046], [px + 0.09, vy - 0.06, back - 0.035], [cx + 0.1, mY - 0.131, back - 0.008]], 0.0038); // 짧은 HDMI
-    // 폴 + C-클램프 (고정)
-    const cz1 = d.z1 - 0.022, cz2 = d.z1 + 0.075, top = DESK_H, und = DESK_H - 0.025;
-    bt.aabb(M.black, ax - 0.032, ax + 0.032, top, top + 0.014, cz1, cz2);
-    bt.aabb(M.black, ax - 0.032, ax + 0.032, und - 0.075, top + 0.014, cz1, cz1 + 0.02);
-    bt.aabb(M.black, ax - 0.032, ax + 0.032, und - 0.075, und - 0.06, cz1, cz2);
-    bt.cyl(M.steelDark, 0.007, 0.06, ax, und - 0.03, az + 0.015, 8);
-    bt.aabb(M.dark, ax - 0.022, ax + 0.022, und - 0.006, und, az - 0.007, az + 0.037);
-    bt.cyl(M.black, 0.018, 0.012, ax, und - 0.09, az + 0.015, 10);
-    bt.box(M.black, 0.06, 0.01, 0.012, ax, und - 0.09, az + 0.015);
+    bC.aabb(M.silver, vx - 0.055, vx + 0.055, vy - 0.055, vy + 0.055, back - 0.023, back - 0.018);
+    bC.aabb(M.silver, vx - 0.075, vx - 0.055, vy - 0.012, vy + 0.012, back - 0.022, back - 0.018);
+    bC.aabb(M.silver, vx + 0.055, vx + 0.07, vy - 0.012, vy + 0.012, back - 0.022, back - 0.018);
+    for (const [sx, sy] of [[-0.045, -0.045], [-0.045, 0.045], [0.045, -0.045], [0.045, 0.045]]) bC.cyl(M.steelDark, 0.005, 0.006, vx + sx, vy + sy, back - 0.025, 6, Math.PI / 2);
+    bC.aabb(M.silver, px - 0.0625, px + 0.0625, vy - 0.0625, vy + 0.0625, back - 0.064, back - 0.024); // 미니PC 알루미늄 테두리
+    bC.plane(M.pcFace, 0.115, 0.115, px, vy, back - 0.0645, Math.PI);
+    for (const [sy, h] of [[0.03, 0.012], [0.017, 0.008], [0.005, 0.008], [-0.012, 0.008], [-0.035, 0.014]]) bC.aabb(M.black, px + 0.0625, px + 0.064, vy + sy - h / 2, vy + sy + h / 2, back - 0.052, back - 0.036);
+    bC.tube(M.cable, [[px + 0.065, vy + 0.03, back - 0.044], [px + 0.082, vy + 0.02, back - 0.046], [px + 0.09, vy - 0.06, back - 0.035], [cx + 0.1, mY - 0.131, back - 0.008]], 0.0038); // 짧은 HDMI
+    // 폴 + C-클램프 (고정) — 앞 가림판이 앞 모서리를 차지하므로 클램프는 북서 모서리의 왼쪽(서쪽) 옆 모서리를 물음
+    const top = DESK_H, und = DESK_H - 0.025, kx1 = d.x1 - 0.022, kz1 = d.z1 + PART_T + 0.002, kz2 = d.z1 + 0.072;
+    bt.aabb(M.black, kx1, ax + 0.032, top, top + 0.014, kz1, kz2);                 // 윗 턱 (상판 위, 가림판 뒤)
+    bt.aabb(M.black, kx1, kx1 + 0.02, und - 0.075, top + 0.014, kz1, kz2);         // 옆 몸통 (상판 왼쪽 옆면 바깥)
+    bt.aabb(M.black, kx1, d.x1 + 0.022, und - 0.075, und - 0.06, kz1, kz2);        // 아래 턱 (다리 앞까지)
+    const kzc = (kz1 + kz2) / 2, ksx = d.x1 + 0.009;
+    bt.cyl(M.steelDark, 0.007, 0.06, ksx, und - 0.03, kzc, 8);
+    bt.aabb(M.dark, d.x1 - 0.002, d.x1 + 0.021, und - 0.006, und, kz1 + 0.004, kz2 - 0.004);
+    bt.cyl(M.black, 0.013, 0.012, ksx, und - 0.09, kzc, 10);                       // 조임 손잡이 (다리와 떨어지게 작게, 막대는 앞뒤 방향)
+    bt.box(M.black, 0.012, 0.01, 0.05, ksx, und - 0.09, kzc);
     bt.cyl(M.black, 0.018, 0.45, ax, DESK_H + 0.225, az, 12);
     bt.cyl(M.black, 0.021, 0.012, ax, DESK_H + 0.455, az, 12);
-    // 수평 2관절 암: 폴 칼라·첫 마디·팔꿈치(A) → 둘째 마디·틸트 브래킷(B)
+    // 수평 암: 폴 칼라·첫 마디·팔꿈치(A) → 짧은 둘째 마디·스위블 축(B) → 틸트 브래킷·VESA·모니터·미니PC(C)
     const seg = (b, x1, z1, x2, z2) => b.box(M.black, Math.hypot(x2 - x1, z2 - z1) + 0.04, 0.035, 0.045, (x1 + x2) / 2, ay, (z1 + z2) / 2, -Math.atan2(z2 - z1, x2 - x1));
     bA.cyl(M.black, 0.03, 0.05, ax, ay, az, 12);
     seg(bA, ax, az, jx, jz); bA.cyl(M.black, 0.026, 0.05, jx, ay, jz, 12);
     seg(bB, jx, jz, vx, vz);
-    bB.aabb(M.silver, vx - 0.028, vx + 0.028, ay - 0.045, ay + 0.045, back - 0.05, back - 0.023);
-    bB.cyl(M.silver, 0.016, 0.07, vx, ay, back - 0.062, 12);
-    bB.cyl(M.steelDark, 0.009, 0.075, vx, ay, back - 0.062, 8, 0, Math.PI / 2);
     bB.aabb(M.black, vx - 0.024, vx + 0.024, ay - 0.022, ay + 0.022, vz - 0.02, back - 0.07);
-    // 케이블: 미니PC 옆 포트 2가닥 + 모니터 전원 → 둘째 마디 아래(B) → 팔꿈치 관절 속 → 첫 마디 아래(A) → 폴 칼라 속 →
-    //   폴 뒤(고정) → 상판 앞 모서리 → 클램프 아래 묶음 → 가림판 바깥으로 내려가 바닥 콘센트 박스
-    const J = [jx, ay - 0.02, jz], P = [ax, ay - 0.02, az];
-    const pathB = [[px - 0.01, vy - 0.07, back - 0.05], [vx, ay - 0.065, vz + 0.012], [(jx + vx) / 2, ay - 0.035, (jz + vz) / 2], J];
-    const pathA = [J, [(ax + jx) / 2, ay - 0.035, az + 0.004], P];
-    const pathS = [P, [ax + 0.03, ay - 0.07, az - 0.002], [ax + 0.024, DESK_H + 0.09, az - 0.006], [ax + 0.05, DESK_H + 0.025, d.z1 + 0.004],
-      [ax + 0.052, DESK_H - 0.02, d.z1 - 0.014], [ax + 0.052, und - 0.12, d.z1 - 0.014], [ax + 0.06, 0.34, d.z1 - 0.012], [ax + 0.08, 0.2, d.z1 + 0.06], [fx, 0.07, fz - 0.03], [fx, 0.012, fz]];
+    bB.cyl(M.silver, 0.016, 0.07, vx, ay, sz, 12);                                   // 스위블 축 (세로)
+    bC.aabb(M.silver, vx - 0.028, vx + 0.028, ay - 0.045, ay + 0.045, back - 0.05, back - 0.023);
+    bC.cyl(M.steelDark, 0.009, 0.075, vx, ay, sz, 8, 0, Math.PI / 2);               // 틸트 축 (가로)
+    // 케이블: 미니PC 옆 포트 2가닥 + 모니터 전원 → 스위블 축 속(C→B) → 둘째 마디 아래(B) → 팔꿈치 관절 속 → 첫 마디 아래(A) → 폴 칼라 속 →
+    //   폴 뒤(고정) → 상판 왼쪽 옆 모서리(클램프 바로 남쪽) → 책상 옆으로 내려가 아래 묶음 → 바닥 콘센트 박스
+    //   (관절 이음점 Q·J·P는 각 회전축 위 — 축 안에 숨어 있어 돌려도 끊기지 않음)
+    const Q = [vx, ay - 0.02, sz], J = [jx, ay - 0.02, jz], P = [ax, ay - 0.02, az];
+    const pathC = [[px - 0.01, vy - 0.07, back - 0.05], [vx + 0.016, ay - 0.06, sz + 0.012], Q];
+    const pathB = [Q, [vx - 0.004, ay - 0.062, (sz + vz) / 2], [(jx + vx) / 2 + 0.004, ay - 0.05, (jz + vz) / 2], J];
+    const pathA = [J, [(ax + jx) * 0.5, ay - 0.04, az + 0.004], P];
+    const pathS = [P, [ax - 0.024, ay - 0.07, az + 0.012], [ax - 0.026, DESK_H + 0.055, az + 0.024], [d.x1 + 0.004, DESK_H + 0.026, d.z1 + 0.088],
+      [d.x1 - 0.012, DESK_H - 0.012, d.z1 + 0.092], [d.x1 - 0.012, und - 0.12, d.z1 + 0.092], [d.x1 - 0.004, 0.34, d.z1 + 0.1], [d.x1 + 0.08, 0.2, d.z1 + 0.15], [fx, 0.07, fz - 0.03], [fx, 0.012, fz]];
     const starts = [[px + 0.065, vy - 0.012, back - 0.044], [px + 0.065, vy - 0.035, back - 0.044], [cx + 0.12, mY - 0.131, back - 0.01]];
     const offs = [[0, 0, 0], [0.006, 0.002, 0.003], [-0.002, 0.004, 0.006]];
     const off = (pts, o) => pts.map(([x, y, z]) => [x + o[0], y + o[1], z + o[2]]);
     starts.forEach((st, i) => {
-      bB.tube(M.cable, [st, ...off(pathB, offs[i])], 0.0032);
+      bC.tube(M.cable, [st, ...off(pathC, offs[i])], 0.0032);
+      bB.tube(M.cable, off(pathB, offs[i]), 0.0032);
       bA.tube(M.cable, off(pathA, offs[i]), 0.0032);
       const sp = off(pathS, offs[i]); sp[sp.length - 1] = [fx + offs[i][0] * 2, 0.012, fz + offs[i][2] * 2];
       bt.tube(M.cable, sp, 0.0032);
     });
-    // 키보드·마우스 USB 케이블: 미니PC 옆 USB 포트 → 모니터 뒤·암 아래(B·A, 위 묶음과 함께) → 폴을 따라 내려와 → 폴 밑동(공통 이음점)
+    // 키보드·마우스 USB 케이블: 미니PC 옆 USB 포트 → 스위블 축·둘째 마디·첫 마디 아래(위 묶음과 함께) → 폴을 따라 내려와 → 폴 밑동(공통 이음점)
     //   → 실습실 모드: 상판 위로 키보드·마우스 뒤까지 / 일반 수업 모드: 상판 남쪽 끝으로 넘어가 늘어졌다가 바스켓 앞 테두리를 넘어 서랍 속 키보드·마우스로
     const kb = by1 + 0.004;
-    const JB = [ax + 0.026, DESK_H + 0.022, az + 0.02];   // 폴 밑동 (클램프 위 턱 위)
+    const JB = [ax + 0.026, DESK_H + 0.022, az + 0.02];   // 폴 밑동 (클램프 윗 턱 위)
     const usbs = [[px + 0.065, vy + 0.005, back - 0.044], [px + 0.065, vy + 0.017, back - 0.044]];   // 키보드, 마우스
     const koffs = [[0.003, -0.004, -0.005], [-0.005, -0.003, 0.0]];
     usbs.forEach((st, i) => {
       const o = koffs[i];
-      bB.tube(M.cable, [st, ...off(pathB, o)], 0.0026);
+      bC.tube(M.cable, [st, ...off(pathC, o)], 0.0026);
+      bB.tube(M.cable, off(pathB, o), 0.0026);
       bA.tube(M.cable, off(pathA, o), 0.0026);
-      bt.tube(M.cable, [...off([P, [ax + 0.03, ay - 0.07, az - 0.002], [ax + 0.024, DESK_H + 0.09, az - 0.006]], o), JB.map((v, k) => v + o[k])], 0.0026);
+      bt.tube(M.cable, [...off([P, [ax + 0.03, ay - 0.07, az - 0.002], [ax + 0.024, DESK_H + 0.055, az - 0.006]], o), JB.map((v, k) => v + o[k])], 0.0026);
       const jb = JB.map((v, k) => v + o[k]), lift = [ax + 0.05 + o[0], DESK_H + 0.004, az + 0.085 + o[2]];
       const labEnd = i === 0
         ? [[cx - 0.2, DESK_H + 0.004, d.z1 + 0.285], [cx - 0.15, DESK_H + 0.01, d.z1 + 0.298]]
@@ -531,17 +545,18 @@ export function buildRoom(scene, screenTex) {
         : [[bx1 + 0.03, kb + 0.006, d.z1 + 0.24], [bx1 + 0.04, kb + 0.006, d.z1 + 0.06], [cx + 0.11, kb + 0.012, d.z1 + 0.068]];
       genB.tube(M.cable, [jb, lift, ...droop, ...genEnd], 0.0026);
     });
-    { const [x, y, z] = pathB[2]; bB.box(M.tie, 0.024, 0.014, 0.024, x + 0.003, y, z + 0.004); }       // 벨크로 케이블 타이
-    for (const k of [2, 5]) { const [x, y, z] = pathS[k]; bt.box(M.tie, 0.024, 0.014, 0.024, x + 0.003, y, z + 0.004); }
+    { const [x, y, z] = pathA[1]; bA.box(M.tie, 0.024, 0.014, 0.024, x + 0.003, y, z + 0.004); }       // 벨크로 케이블 타이
+    for (const k of [2, 5]) { const [x, y, z] = pathS[k]; bt.box(M.tie, 0.024, 0.014, 0.024, x, y, z); }
     bt.aabb(M.alu, fx - 0.11, fx + 0.11, 0, 0.006, fz - 0.11, fz + 0.11);   // 바닥 콘센트 박스 (전원·LAN) + 브러시 그로밋
     bt.aabb(M.black, fx - 0.07, fx + 0.07, 0.006, 0.01, fz - 0.025, fz + 0.025);
     bt.aabb(M.dark, fx - 0.09, fx - 0.03, 0.006, 0.012, fz + 0.045, fz + 0.09);
     const gA = new THREE.Group(); gA.name = 'monArmA_' + d.n; gA.position.set(ax, 0, az); root.add(gA);
     const gB = new THREE.Group(); gB.name = 'monArmB_' + d.n; gB.position.set(jx - ax, 0, jz - az); gA.add(gB);
-    bA.build(gA, ax, az); bB.build(gB, jx, jz);
-    const sg = new THREE.PlaneGeometry(0.598, 0.336); sg.translate(cx - jx, mY + 0.005, mz + 0.001 - jz);
-    { const sm = new THREE.Mesh(sg, scrMat[studentScreens[(d.n - 1) % 4]]); sm.name = 'screens_' + studentScreens[(d.n - 1) % 4] + '_' + d.n; gB.add(sm); }
-    monArms.push({ n: d.n, a: gA, b: gB });
+    const gC = new THREE.Group(); gC.name = 'monHead_' + d.n; gC.position.set(vx - jx, 0, sz - jz); gB.add(gC);
+    bA.build(gA, ax, az); bB.build(gB, jx, jz); bC.build(gC, vx, sz);
+    const sg = new THREE.PlaneGeometry(0.598, 0.336); sg.translate(cx - vx, mY + 0.005, mz + 0.001 - sz);
+    { const sm = new THREE.Mesh(sg, scrMat[studentScreens[(d.n - 1) % 4]]); sm.name = 'screens_' + studentScreens[(d.n - 1) % 4] + '_' + d.n; gC.add(sm); }
+    monArms.push({ n: d.n, a: gA, b: gB, c: gC });
     // 키보드·마우스: 실습실 모드 = 책상 위 / 일반 수업 모드 = 바스켓 서랍 안
     labB.aabb(M.dark, cx - 0.22, cx + 0.22, DESK_H, DESK_H + 0.018, d.z1 + 0.30, d.z1 + 0.44);
     labB.aabb(M.key, cx - 0.21, cx + 0.21, DESK_H + 0.018, DESK_H + 0.022, d.z1 + 0.31, d.z1 + 0.43);
@@ -563,7 +578,7 @@ export function buildRoom(scene, screenTex) {
       genB.aabb(M.plug, q - 0.02, q + 0.02, 0.453, 0.497, sz2, sz2 + 0.028);
       genB.tube(M.cable, [[q, 0.475, sz2 + 0.028], [q + 0.04, 0.42, sz2 + 0.1], [d.x2 - 0.06, 0.5, d.z1 + 0.45], [d.x2 + 0.02, 0.66, d.z1 + 0.53], [d.x2 + 0.012, DESK_H + 0.008, d.z1 + 0.53], [d.x2 - 0.03, DESK_H + 0.005, d.z1 + 0.5], [lx + 0.163, ly + 0.008, d.z1 + 0.42]], 0.003);
     } else {
-      const ry = (rnd(d.n, 1) - 0.5) * 0.24, bxc = cx + (rnd(d.n, 2) - 0.5) * 0.08, bzc = d.z1 + 0.40 + (rnd(d.n, 3) - 0.5) * 0.05;
+      const ry = (rnd(d.n, 1) - 0.5) * 0.24, bxc = cx + 0.095 + (rnd(d.n, 2) - 0.5) * 0.05, bzc = d.z1 + 0.40 + (rnd(d.n, 3) - 0.5) * 0.05;   // 왼쪽 가장자리의 모니터를 피해 오른쪽으로
       const B4 = T4(bxc, DESK_H, bzc, ry), W_ = 0.2, Dp = 0.27;
       genB.boxM(coverMats[d.n % coverMats.length], 2 * W_ + 0.012, 0.004, Dp + 0.012, B4.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.002, 0)));
       for (const sgn of [-1, 1]) {   // 양쪽 페이지 묶음: 가운데(제본)로 살짝 기울어진 V자
@@ -575,14 +590,14 @@ export function buildRoom(scene, screenTex) {
       }
       const tool = d.n % 4;   // 0: 연필, 1: 파란 펜, 2: 없음, 3: 연필 + 검정 펜
       const lay = (mat, len, r, x, z, yaw, seg = 6) => genB.geoM(mat, new THREE.CylinderGeometry(r, r, len, seg), T4(x, DESK_H + r, z, yaw, 0, Math.PI / 2));
-      const px0 = bxc + 0.25, pz0 = bzc + (rnd(d.n, 4) - 0.5) * 0.08, pyaw = 0.3 + rnd(d.n, 5) * 0.9;
+      const px0 = bxc + (rnd(d.n, 4) - 0.5) * 0.12, pz0 = d.z1 + 0.175, pyaw = (rnd(d.n, 5) - 0.5) * 0.5;   // 책 앞(북쪽) 빈 자리
       if (tool === 0 || tool === 3) {
         lay(M.pencil, 0.15, 0.0038, px0, pz0, pyaw);
         const dx = Math.cos(pyaw) * 0.085, dz = -Math.sin(pyaw) * 0.085;
         genB.geoM(M.pencilWood, new THREE.ConeGeometry(0.0038, 0.02, 6), T4(px0 + dx, DESK_H + 0.0038, pz0 + dz, pyaw, 0, -Math.PI / 2));
         lay(M.eraser, 0.012, 0.0039, px0 - Math.cos(pyaw) * 0.081, pz0 + Math.sin(pyaw) * 0.081, pyaw);
       }
-      if (tool === 1 || tool === 3) lay(tool === 1 ? M.pen : M.penBlack, 0.14, 0.0045, px0 + 0.03, pz0 + 0.05, pyaw + 0.5, 10);
+      if (tool === 1 || tool === 3) lay(tool === 1 ? M.pen : M.penBlack, 0.14, 0.0045, px0 + 0.02, pz0 - 0.04, pyaw * 0.6 + 0.12, 10);
     }
     // 오른쪽(동쪽) 옆: 가방 고리 + 책가방 (대부분의 책상, 색 다양)
     const hz = d.z1 + 0.33;

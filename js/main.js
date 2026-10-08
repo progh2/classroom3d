@@ -92,12 +92,15 @@ const pickAtClient = (x, y) => pick((x / innerWidth) * 2 - 1, -(y / innerHeight)
 function toggle() { setMode(modeIdx + 1); }
 // ── 교탁 가운데 / 일반 수업 모드 (스위치 2·3, T·G 키, 🧑‍🏫·📖 버튼) ──
 const teachSt = { t: 0, target: 0 }, genSt = { t: 0, target: 0 };
-const ARM_A = -50 * Math.PI / 180, ARM_B = -40 * Math.PI / 180;   // 폴 기준 왼쪽으로 50° + 팔꿈치 40° → 화면이 책상 왼쪽 가장자리를 따라 섬
+// 일반 수업: 폴 기준 -92°(왼쪽·남쪽으로) + 팔꿈치 +132° + VESA 스위블 +40° → 모니터가 책상 왼쪽 가장자리를 따라 서고 화면은 안쪽(책상 가운데·학생 쪽)을 향함.
+//   스위블은 팔이 35% 돈 뒤부터 함께 돌아감 (중간에도 창벽·기둥·앞 가림판에 닿지 않음 — tools/measure_monitors.mjs로 확인)
+const ARM_A = -92 * Math.PI / 180, ARM_B = 132 * Math.PI / 180, ARM_S = 40 * Math.PI / 180, SWIVEL_FROM = 0.35;
 const smooth = x => x * x * (3 - 2 * x);
 let teacherActor = null, teacherCol = null, teacherBaseX = 0;
 function applyGeneral() {
   const e = smooth(genSt.t);
-  for (const m of room.monArms) { m.a.rotation.y = ARM_A * e; m.b.rotation.y = ARM_B * e; }
+  const es = Math.max(0, (e - SWIVEL_FROM) / (1 - SWIVEL_FROM));
+  for (const m of room.monArms) { m.a.rotation.y = ARM_A * e; m.b.rotation.y = ARM_B * e; m.c.rotation.y = ARM_S * es; }
   room.labOnly.visible = genSt.t < 0.5; room.genOnly.visible = genSt.t >= 0.5;
   for (const mt of room.studentScrMats) mt.color.setScalar(1 - 0.8 * e);   // 일반 수업: 학생 화면은 어둡게(절전)
   room.switches[2].led.material.color.set(genSt.target ? '#5cff6a' : '#444');
