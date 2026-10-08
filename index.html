@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>미림마이스터고 3학년 교실 겸 SW실습실 — 3D 둘러보기</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/",
+    "@pixiv/three-vrm": "./vendor/three-vrm/three-vrm.module.min.js"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="title">미림마이스터고 · 3학년 교실 겸 SW실습실 <span class="dim">A-101 (6.6 × 8.4 m)</span></div>
+  <div id="mode"><span id="modeIcon">🌅</span> <span id="modeText">아침</span></div>
+</div>
+<div id="crosshair"></div>
+<div id="hint"></div>
+<div id="help"></div>
+<button id="lightBtn" title="조명 모드 바꾸기">💡</button>
+<button id="seatBtn" title="앉기 / 일어나기">🪑</button>
+<button id="teachBtn" title="교탁 가운데 / 원래 자리">🧑‍🏫</button>
+<button id="genBtn" title="일반 수업 / 실습실 모드">📖</button>
+<div id="joy"><div id="joyKnob"></div></div>
+<div id="loading"><div class="box"><div class="t">교실 불러오는 중…</div><div id="loadMsg">준비 중</div><div class="bar"><i id="loadBar"></i></div></div></div>
+<div id="start" class="hidden"><div class="box">
+  <div class="t">3학년 교실 겸 SW실습실 둘러보기</div>
+  <div id="startHelp"></div>
+  <button id="startBtn">시작하기</button>
+</div></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
