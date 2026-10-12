@@ -27,13 +27,44 @@ export class FPControls {
     document.addEventListener('keyup', e => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear());
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === d; this.onLockChange?.(this.locked); });
+    // 스타일러스(pointerType 'pen') 수정(t1012): 펜은 포인터 잠금을 쓰지 않고 '누른 채 끌기'로만 둘러봄.
+    //   이전 포인터 위치와의 차이로 회전, pointerdown/up/cancel/leave/lostcapture 때 기준점 초기화, 버튼 없는 호버 이동은 무시.
+    //   (예전: 펜 클릭 → 포인터 잠금 → 펜 호버의 절대좌표 점프가 movementX로 쌓여 시점이 계속 돎)
+    this.lastPointerType = 'mouse';
+    this.pen = { id: null, x: 0, y: 0, sx: 0, sy: 0, moved: false, t: 0 };
+    document.addEventListener('pointermove', e => { this.lastPointerType = e.pointerType; }, true);
+    d.addEventListener('pointerdown', e => {
+      this.lastPointerType = e.pointerType;
+      if (e.pointerType !== 'pen') return;
+      if (this.locked && document.exitPointerLock) document.exitPointerLock();
+      Object.assign(this.pen, { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, moved: false, t: e.timeStamp });
+      try { d.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();   // 호환 mousedown(→ 포인터 잠금 요청) 막기
+    });
+    d.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'pen' || e.pointerId !== this.pen.id) return;
+      if (!(e.buttons & 1)) { this.pen.id = null; return; }   // 버튼을 뗀 채 움직임(호버) → 끌기 끝
+      const dx = e.clientX - this.pen.x, dy = e.clientY - this.pen.y;
+      this.pen.x = e.clientX; this.pen.y = e.clientY;
+      if (Math.hypot(e.clientX - this.pen.sx, e.clientY - this.pen.sy) > 8) this.pen.moved = true;
+      this.yaw -= dx * 0.005; this.pitch -= dy * 0.005; this.clampPitch();
+      e.preventDefault();
+    });
+    const penEnd = e => {
+      if (e.pointerType !== 'pen' || e.pointerId !== this.pen.id) return;
+      if (e.type === 'pointerup' && !this.pen.moved && e.timeStamp - this.pen.t < 450) this.onTap?.(e.clientX, e.clientY);
+      this.pen.id = null;
+    };
+    for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture']) d.addEventListener(ev, penEnd);
     document.addEventListener('mousemove', e => {
-      if (!this.locked) return;
+      if (!this.locked || this.lastPointerType === 'pen') return;
       this.yaw -= e.movementX * 0.0022; this.pitch -= e.movementY * 0.0022; this.clampPitch();
     });
     const joyEl = document.getElementById('joy'), knob = document.getElementById('joyKnob');
     d.addEventListener('touchstart', e => {
+      if (this.pen.id !== null) { e.preventDefault(); return; }   // 펜이 만든 터치 이벤트는 위 펜 처리만
       for (const t of e.changedTouches) {
+        if (t.touchType === 'stylus') continue;
         if (t.clientX < window.innerWidth * 0.45 && this.joy.id === null) {
           this.joy.id = t.identifier; this.joy.cx = t.clientX; this.joy.cy = t.clientY; this.joy.x = this.joy.y = 0;
           joyEl.style.left = (t.clientX - 65) + 'px'; joyEl.style.top = (t.clientY - 65) + 'px'; joyEl.style.bottom = 'auto';
