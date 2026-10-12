@@ -134,10 +134,10 @@ function deskURL(cm) {
 }
 function setDeskWidth(cm) { if (cm === deskCm) return; flash(`책상 폭 ${cm} cm로 바꾸는 중…`); setTimeout(() => location.replace(deskURL(cm)), 60); }
 function cycleDesk() { const i = DESK_WIDTHS.indexOf(DESK_W); setDeskWidth(Math.round(DESK_WIDTHS[(i + 1) % DESK_WIDTHS.length] * 100)); }
-// ── 네트워크함 위치 (북서 천장 모서리 ↔ 복도 쪽 벽 가운데 기둥) ──
+// ── 네트워크함 위치 (북서 천장 모서리 ↔ 복도 천장, 가운데 기둥 복도 면) ──
 function updateInfo() {
   document.getElementById('deskInfo').textContent = `책상 ${deskCm} cm`;
-  document.getElementById('netInfo').textContent = '네트워크함 ' + (room.net.loc === 'e' ? '복도 쪽 벽' : '북서 모서리');
+  document.getElementById('netInfo').textContent = '네트워크함 ' + (room.net.loc === 'e' ? '복도 천장' : '북서 모서리');
   document.getElementById('xrayInfo').textContent = xray ? ' · 바닥 투시' : '';
   const sw = k => room.switches.find(w => w.key === k);
   sw('net').led.material.color.set(room.net.loc === 'e' ? '#5cff6a' : '#444');
@@ -145,12 +145,13 @@ function updateInfo() {
   sw('desk').led.material.color.set(['#444', '#ffd24a', '#5cff6a'][DESK_WIDTHS.indexOf(DESK_W)]);
 }
 function setNet(loc) { room.net.set(loc === 'e' ? 'e' : 'nw'); updateInfo(); }
-function toggleNet() { setNet(room.net.loc === 'e' ? 'nw' : 'e'); flash('네트워크함: ' + (room.net.loc === 'e' ? '복도 쪽 벽(가운데 기둥)' : '북서 천장 모서리')); }
+function toggleNet() { setNet(room.net.loc === 'e' ? 'nw' : 'e'); flash('네트워크함: ' + (room.net.loc === 'e' ? '복도 천장(가운데 기둥 복도 면)' : '북서 천장 모서리')); }
 // ── 바닥 투시: 액세스플로어 판을 반투명하게 → 바닥 밑 LAN 배선·받침대 보임 ──
 let xray = false;
 function setXray(v) {
   xray = !!v; const m = room.floorMat;
   m.transparent = xray; m.opacity = xray ? 0.22 : 1; m.depthWrite = !xray; m.needsUpdate = true;
+  room.net.xrayOnly.forEach(o => { o.visible = xray; });
   updateInfo();
 }
 function toggleXray() { setXray(!xray); }
@@ -249,7 +250,7 @@ loadCast(scene, room.chairs, 'assets/vrm/', (n, total, file) => {
   const st = document.getElementById('start');
   document.getElementById('startHelp').innerHTML = isTouch
     ? '· 왼쪽 엄지로 이동, 오른쪽을 드래그해 둘러보기<br>· 앞문 옆 <b>조명 스위치</b>를 탭하거나 💡 버튼: 아침 → 점심 → 저녁<br>· 그 아래 스위치 또는 🧑‍🏫: 교탁을 앞 가운데로 · 📖: 일반 수업 모드(모니터 젖히고 책)<br>· 📏 책상 폭 70·80·90 · 🌐 네트워크함 위치 · 🔍 바닥 투시<br>· <b>문</b>을 탭하면 열고 닫기 → 복도로 나갈 수 있어요<br>· 빈 의자를 조준하고 🪑 (또는 의자 탭): 앉기 · 🪑/조이스틱: 일어나기'
-    : '· 클릭하면 마우스 시점 고정 (Esc로 해제)<br>· <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 이동, <kbd>Shift</kbd> 빠르게, <kbd>C</kbd> 웅크리기/서기<br>· 앞문 옆 <b>조명 스위치</b>를 조준해 클릭 또는 <kbd>L</kbd>: 아침 → 점심 → 저녁<br>· 그 아래 스위치: <b>교탁 가운데</b>(<kbd>T</kbd>) · <b>일반 수업</b>(<kbd>G</kbd>, 모니터를 왼쪽으로 젖히고 키보드는 서랍에, 책을 펼침)<br>· <kbd>K</kbd> 또는 <kbd>7</kbd>/<kbd>8</kbd>/<kbd>9</kbd>: 책상 폭 70·80·90 cm · <kbd>N</kbd>: 네트워크함 위치(북서 모서리 ↔ 복도 쪽 벽) · <kbd>F</kbd>: 바닥 투시(바닥 밑 LAN) · 네트워크함 조준 <kbd>E</kbd>: 문 열기<br>· <b>문</b>을 조준하고 <kbd>E</kbd> 또는 클릭: 열기/닫기 → 복도로 나갈 수 있어요<br>· 빈 <b>의자</b>를 조준하고 <kbd>E</kbd>: 앉기 · <kbd>E</kbd>/<kbd>C</kbd>/<kbd>Esc</kbd>: 일어나기';
+    : '· 클릭하면 마우스 시점 고정 (Esc로 해제)<br>· <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 이동, <kbd>Shift</kbd> 빠르게, <kbd>C</kbd> 웅크리기/서기<br>· 앞문 옆 <b>조명 스위치</b>를 조준해 클릭 또는 <kbd>L</kbd>: 아침 → 점심 → 저녁<br>· 그 아래 스위치: <b>교탁 가운데</b>(<kbd>T</kbd>) · <b>일반 수업</b>(<kbd>G</kbd>, 모니터를 왼쪽으로 젖히고 키보드는 서랍에, 책을 펼침)<br>· <kbd>K</kbd> 또는 <kbd>7</kbd>/<kbd>8</kbd>/<kbd>9</kbd>: 책상 폭 70·80·90 cm · <kbd>N</kbd>: 네트워크함 위치(북서 모서리 ↔ 복도 천장) · <kbd>F</kbd>: 바닥 투시(바닥 밑 LAN) · 네트워크함 조준 <kbd>E</kbd>: 문 열기<br>· <b>문</b>을 조준하고 <kbd>E</kbd> 또는 클릭: 열기/닫기 → 복도로 나갈 수 있어요<br>· 빈 <b>의자</b>를 조준하고 <kbd>E</kbd>: 앉기 · <kbd>E</kbd>/<kbd>C</kbd>/<kbd>Esc</kbd>: 일어나기';
   { // 책상 폭 전환으로 다시 불러온 경우: 조명·교탁·일반 수업·바닥 투시·시점 복원
     const q = new URLSearchParams(location.search);
     if (q.has('light')) setMode(+q.get('light') || 0);
@@ -292,7 +293,7 @@ renderer.setAnimationLoop(() => {
     msg = tg.key === 'teach' ? how + ': ' + (teachSt.target ? '교탁 원래 자리로' : '교탁 가운데로')
       : tg.key === 'general' ? how + ': ' + (genSt.target ? '실습실 모드로' : '일반 수업 모드로')
       : tg.key === 'desk' ? how + `: 책상 폭 바꾸기 (지금 ${deskCm} cm → ${Math.round(DESK_WIDTHS[(DESK_WIDTHS.indexOf(DESK_W) + 1) % 3] * 100)} cm)`
-      : tg.key === 'net' ? how + ': 네트워크함 ' + (room.net.loc === 'e' ? '북서 천장 모서리로' : '복도 쪽 벽(가운데 기둥)으로')
+      : tg.key === 'net' ? how + ': 네트워크함 ' + (room.net.loc === 'e' ? '북서 천장 모서리로' : '복도 천장(가운데 기둥 복도 면)으로')
       : tg.key === 'floor' ? how + ': 바닥 투시 ' + (xray ? '끄기' : '켜기 (바닥 밑 LAN 배선)')
       : how + ': 조명 모드 바꾸기 (지금 ' + MODES[modeIdx].label + ')';
   }

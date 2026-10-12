@@ -872,20 +872,33 @@ function buildNetwork(root, M, lam, colliders) {
     const cv2 = new THREE.Mesh(new THREE.PlaneGeometry(0.11, Y0), coverMat); cv2.position.set(0.055, Y0 / 2, 0.1); cv2.renderOrder = 3; g.add(cv2);
     groups.nw = g; g.userData.col = { x1: 0, x2: 0.11, z1: 0, z2: 0.1 };
   }
-  // ── 동쪽 (복도 쪽 벽 가운데 기둥) ──
+  // ── 복도 쪽 (정정 #6): 복도 천장 밑, 가운데 기둥 자리 교실 동쪽 벽의 '복도 면'(x 6.74)에 매달린 함 ──
+  //   함 → 기둥 복도 면(x 6.82)의 세로 몰딩(x 6.82~6.90)으로 내려옴 → 돌출부 속 → 복도 바닥보다 위·교실 바닥 밑(y −0.1)에서
+  //   벽·기둥 관통 → 교실 액세스플로어 밑 간선(x 6.45) → 각 자리. 사물함은 기둥 앞(z 3.9~4.5)을 비워 두고, 함은 창(z<3.9, >4.5) 사이 벽에 들어감.
+  const xrayOnly = [];
   { const g = new THREE.Group(); g.name = 'net_e'; root.add(g);
-    const zc = (EAST_COLUMN.z1 + EAST_COLUMN.z2) / 2, xf = EAST_COLUMN.x1;
-    const box = new THREE.Group(); box.position.set(xf, 0, zc); box.rotation.y = -Math.PI / 2; g.add(box);
+    const zc = (EAST_COLUMN.z1 + EAST_COLUMN.z2) / 2, CF = ROOM.W + 0.14 + 0.08;   // 기둥의 복도 쪽 면 (x 6.82)
+    const box = new THREE.Group(); box.position.set(CF, 0, zc); box.rotation.y = Math.PI / 2; g.add(box);
     const c = cabinet(box, '네트워크함'); doors.e = c.door; c.hit.userData.netbox = 'e'; hits.push(c.hit);
     const b = new Batcher(vc);
-    // 기둥 속 매입 배관: 기둥 면(x 6.555)의 점검 덮개(반투명) 뒤로 묶음이 천장 밑 함 바닥 → 슬래브까지
-    for (let i = 0; i < 6; i++) b.cyl(M.lan, 0.004, Y0 + 0.19, xf + 0.012 + (i % 2) * 0.01, (Y0 - 0.19) / 2, zc - 0.03 + Math.floor(i / 2) * 0.03, 6);
-    for (let i = 0; i < 6; i++) b.tube(M.lan, [[xf - 0.03, Y0 - 0.01, zc - 0.03 + Math.floor(i / 2) * 0.03], [xf - 0.01, Y0 - 0.05, zc - 0.03 + Math.floor(i / 2) * 0.03], [xf + 0.012 + (i % 2) * 0.01, Y0 - 0.1, zc - 0.03 + Math.floor(i / 2) * 0.03]], 0.004);
-    b.aabb(M.duct, xf - 0.004, xf, Y0 - 0.12, Y0 - 0.0, zc - 0.07, zc - 0.06); b.aabb(M.duct, xf - 0.004, xf, Y0 - 0.12, Y0, zc + 0.06, zc + 0.07);
-    underfloor(b, [xf + 0.02, UF, zc], 6.45);
+    // 세로 몰딩(뒤·옆판, 앞은 반투명 덮개) + 속 케이블 묶음
+    b.aabb(M.duct, CF, CF + 0.08, -RAISE, Y0, zc - 0.06, zc - 0.056); b.aabb(M.duct, CF, CF + 0.08, -RAISE, Y0, zc + 0.056, zc + 0.06);
+    b.aabb(M.duct, CF, CF + 0.004, -RAISE, Y0, zc - 0.06, zc + 0.06); b.aabb(M.duct, CF, CF + 0.08, -RAISE, -RAISE + 0.004, zc - 0.06, zc + 0.06);
+    for (let i = 0; i < 6; i++) b.cyl(M.lan, 0.004, Y0 + 0.1, CF + 0.025 + (i % 2) * 0.025, (Y0 - 0.1) / 2, zc - 0.03 + Math.floor(i / 2) * 0.03, 6);
+    b.cyl(M.cable, 0.005, Y0 + 0.1, CF + 0.065, (Y0 - 0.1) / 2, zc + 0.03, 6);
+    // 교실 쪽: 벽 관통 후 바닥 밑 간선 (월드)
+    for (let i = 0; i < 6; i++) { const z = zc - 0.03 + Math.floor(i / 2) * 0.03, x = CF + 0.025 + (i % 2) * 0.025;
+      b.tube(M.lan, [[x, -0.05, z], [x, -0.09, z], [x - 0.06, -0.1, z], [ROOM.W - 0.2, -0.12, z], [6.5, UF, z]], 0.004); }
+    underfloor(b, [6.5, UF, zc], 6.45);
     b.build(g);
-    const cv = new THREE.Mesh(new THREE.PlaneGeometry(0.14, Y0 - 0.12), coverMat); cv.rotation.y = -Math.PI / 2; cv.position.set(xf - 0.001, (Y0 - 0.12) / 2, zc); cv.renderOrder = 3; g.add(cv);
-    groups.e = g; g.userData.col = null;
+    const cv = new THREE.Mesh(new THREE.PlaneGeometry(0.12, Y0), coverMat); cv.rotation.y = Math.PI / 2; cv.position.set(CF + 0.081, Y0 / 2, zc); cv.renderOrder = 3; g.add(cv);
+    // 바닥 투시 때만: 벽·기둥 속 관통 경로를 벽 너머로 보이게(깊이 무시 오버레이)
+    const xm = new THREE.MeshBasicMaterial({ color: '#4f8dff', transparent: true, opacity: 0.85, depthTest: false });
+    const path = new THREE.CatmullRomCurve3([[CF + 0.04, Y0, zc], [CF + 0.04, -0.06, zc], [CF - 0.02, -0.1, zc], [ROOM.W - 0.2, -0.12, zc], [6.45, UF, zc + 0.1]].map(v => new THREE.Vector3(...v)), false, 'catmullrom', 0.05);
+    const xp = new THREE.Mesh(new THREE.TubeGeometry(path, 48, 0.018, 8), xm); xp.renderOrder = 10; xp.visible = false; g.add(xp); xrayOnly.push(xp);
+    const sl = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.16), new THREE.MeshBasicMaterial({ color: '#ffb02e', transparent: true, opacity: 0.45, depthTest: false }));
+    sl.position.set(ROOM.W + 0.11, -0.1, zc); sl.renderOrder = 9; sl.visible = false; g.add(sl); xrayOnly.push(sl);   // 벽 관통 슬리브
+    groups.e = g; g.userData.col = { x1: CF, x2: CF + 0.08, z1: zc - 0.06, z2: zc + 0.06 };
   }
   // 바닥 밑 (항상): 슬래브 + 받침대(600 격자) — 평소에는 불투명 바닥판에 가려지고, '바닥 투시'에서 보임
   { const b = new Batcher(vc);
@@ -897,8 +910,9 @@ function buildNetwork(root, M, lam, colliders) {
     b.build(root);
     const slab = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.W, ROOM.D), M.slab2); slab.rotation.x = -Math.PI / 2; slab.position.set(ROOM.W / 2, -RAISE - 0.002, ROOM.D / 2); root.add(slab);
   }
-  const net = { groups, doors, hits, loc: null, doorT: { nw: 0, e: 0 }, doorTarget: { nw: 0, e: 0 },
-    set(loc) { this.loc = loc; for (const k in groups) groups[k].visible = k === loc; } };
+  const net = { groups, doors, hits, xrayOnly, loc: null, doorT: { nw: 0, e: 0 }, doorTarget: { nw: 0, e: 0 },
+    set(loc) { this.loc = loc; for (const k in groups) { groups[k].visible = k === loc; const c = groups[k].userData.col, o = groups[k].userData.col0; if (k === 'e' && c && o) { c.x1 = k === loc ? o.x1 : 1e9; c.x2 = k === loc ? o.x2 : 1e9; } } } };
+  for (const k in groups) { const c = groups[k].userData.col; if (c) { groups[k].userData.col0 = { ...c }; if (k !== 'nw') colliders.push(c); } }
   net.set(NET_START);
   if (groups.nw.userData.col) colliders.push(groups.nw.userData.col);
   return net;
