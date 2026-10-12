@@ -18,7 +18,10 @@ html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:'Pret
 #seatBtn{position:fixed;right:72px;top:calc(12px + env(safe-area-inset-top));width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.5);font-size:24px;color:#fff;display:none}
 #teachBtn,#genBtn{position:fixed;top:calc(68px + env(safe-area-inset-top));width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.5);font-size:22px;color:#fff;display:none}
 #teachBtn{right:72px}#genBtn{right:14px}
-body.touch #joy,body.touch #lightBtn,body.touch #seatBtn,body.touch #teachBtn,body.touch #genBtn{display:block}
+#info{align-self:flex-start;font-size:13px;font-weight:600;background:rgba(0,0,0,.5);color:#fff;padding:4px 12px;border-radius:14px;border:1px solid rgba(255,255,255,.2)}
+#deskBtn,#netBtn,#floorBtn{position:fixed;top:calc(124px + env(safe-area-inset-top));width:48px;height:48px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.5);font-size:22px;color:#fff;display:none}
+#deskBtn{right:130px}#netBtn{right:72px}#floorBtn{right:14px}
+body.touch #joy,body.touch #lightBtn,body.touch #seatBtn,body.touch #teachBtn,body.touch #genBtn,body.touch #deskBtn,body.touch #netBtn,body.touch #floorBtn{display:block}
 body.touch #crosshair{opacity:.5}
 #loading,#start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,10,14,.72)}
 #start{background:rgba(10,10,14,.45)}

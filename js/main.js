@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildRoom } from './room.js';
 import { loadCast, updateActors, actorColliders } from './characters.js';
 import { FPControls } from './controls.js';
-import { ROOM } from './plan.js';
+import { ROOM, DESK_W, DESK_WIDTHS, ARM_POSE } from './plan.js';
 import { assetURL } from './assets.js';
 
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -77,11 +77,12 @@ const controls = new FPControls(camera, canvas, colliders, { eye: 1.6, ...START 
 const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
 const occupied = new Set();                       // VRM 학생이 앉아 있는 책상 번호
-const targets = [...room.switches.map(w => w.hit), ...room.doors.flatMap(d => [d.hit, d.leafHit]), ...room.chairHits];
+const targets = [...room.net.hits, ...room.switches.map(w => w.hit), ...room.doors.flatMap(d => [d.hit, d.leafHit]), ...room.chairHits];
 function pick(nx, ny) {
   camera.updateMatrixWorld(); ndc.set(nx, ny); ray.setFromCamera(ndc, camera); ray.far = 3.2;
   for (const h of ray.intersectObjects(targets, false)) {
     const o = h.object;
+    if (o.userData.netbox) { if (o.userData.netbox !== room.net.loc) continue; return h.distance <= 3.2 ? { type: 'netbox', key: o.userData.netbox } : null; }
     if (o.userData.switch) return h.distance <= 2.5 ? { type: 'switch', key: o.userData.switch } : null;
     if (o.userData.door !== undefined) return h.distance <= 2.5 ? { type: 'door', i: o.userData.door } : null;  // 문틀 또는 열린 문짝
     if (o.userData.chair) return h.distance <= 2.0 && !controls.seated ? { type: 'chair', chair: o.userData.chair, busy: occupied.has(o.userData.chair.n) } : null;
@@ -94,7 +95,8 @@ function toggle() { setMode(modeIdx + 1); }
 const teachSt = { t: 0, target: 0 }, genSt = { t: 0, target: 0 };
 // 일반 수업: 폴 기준 -92°(왼쪽·남쪽으로) + 팔꿈치 +132° + VESA 스위블 +40° → 모니터가 책상 왼쪽 가장자리를 따라 서고 화면은 안쪽(책상 가운데·학생 쪽)을 향함.
 //   스위블은 팔이 35% 돈 뒤부터 함께 돌아감 (중간에도 창벽·기둥·앞 가림판에 닿지 않음 — tools/measure_monitors.mjs로 확인)
-const ARM_A = -92 * Math.PI / 180, ARM_B = 132 * Math.PI / 180, ARM_S = 40 * Math.PI / 180, SWIVEL_FROM = 0.35;
+//   책상 폭마다 자세가 다름 (plan.js ARM_POSE: 70 cm = −92°/+132°/+40°)
+const D2R = Math.PI / 180, ARM_A = ARM_POSE.A * D2R, ARM_B = ARM_POSE.B * D2R, ARM_S = ARM_POSE.S * D2R, SWIVEL_FROM = 0.35;
 const smooth = x => x * x * (3 - 2 * x);
 let teacherActor = null, teacherCol = null, teacherBaseX = 0;
 function applyGeneral() {
@@ -120,6 +122,39 @@ function toggleTeach() {
 function toggleGeneral() { genSt.target = 1 - genSt.target; applyGeneral(); }
 function setTeach(v, instant) { teachSt.target = v ? 1 : 0; if (instant) teachSt.t = teachSt.target; applyTeach(); }
 function setGeneral(v, instant) { genSt.target = v ? 1 : 0; if (instant) genSt.t = genSt.target; applyGeneral(); }
+// ── 책상 폭 70/80/90 (t1012): 배치·암 자세가 바뀌므로 상태를 URL에 담아 다시 불러옴 ──
+const deskCm = Math.round(DESK_W * 100);
+function deskURL(cm) {
+  const q = new URLSearchParams(location.search);
+  q.set('desk', String(cm)); q.set('nostart', '1');
+  q.set('light', String(modeIdx)); q.set('teach', String(teachSt.target)); q.set('gen', String(genSt.target));
+  q.set('net', room.net.loc); q.set('xray', xray ? '1' : '0');
+  const p = controls.pos; q.set('cam', [p.x, p.z, controls.yaw, controls.pitch].map(v => v.toFixed(3)).join(','));
+  return location.pathname + '?' + q.toString() + location.hash;
+}
+function setDeskWidth(cm) { if (cm === deskCm) return; flash(`책상 폭 ${cm} cm로 바꾸는 중…`); setTimeout(() => location.replace(deskURL(cm)), 60); }
+function cycleDesk() { const i = DESK_WIDTHS.indexOf(DESK_W); setDeskWidth(Math.round(DESK_WIDTHS[(i + 1) % DESK_WIDTHS.length] * 100)); }
+// ── 네트워크함 위치 (북서 천장 모서리 ↔ 복도 쪽 벽 가운데 기둥) ──
+function updateInfo() {
+  document.getElementById('deskInfo').textContent = `책상 ${deskCm} cm`;
+  document.getElementById('netInfo').textContent = '네트워크함 ' + (room.net.loc === 'e' ? '복도 쪽 벽' : '북서 모서리');
+  document.getElementById('xrayInfo').textContent = xray ? ' · 바닥 투시' : '';
+  const sw = k => room.switches.find(w => w.key === k);
+  sw('net').led.material.color.set(room.net.loc === 'e' ? '#5cff6a' : '#444');
+  sw('floor').led.material.color.set(xray ? '#5cff6a' : '#444');
+  sw('desk').led.material.color.set(['#444', '#ffd24a', '#5cff6a'][DESK_WIDTHS.indexOf(DESK_W)]);
+}
+function setNet(loc) { room.net.set(loc === 'e' ? 'e' : 'nw'); updateInfo(); }
+function toggleNet() { setNet(room.net.loc === 'e' ? 'nw' : 'e'); flash('네트워크함: ' + (room.net.loc === 'e' ? '복도 쪽 벽(가운데 기둥)' : '북서 천장 모서리')); }
+// ── 바닥 투시: 액세스플로어 판을 반투명하게 → 바닥 밑 LAN 배선·받침대 보임 ──
+let xray = false;
+function setXray(v) {
+  xray = !!v; const m = room.floorMat;
+  m.transparent = xray; m.opacity = xray ? 0.22 : 1; m.depthWrite = !xray; m.needsUpdate = true;
+  updateInfo();
+}
+function toggleXray() { setXray(!xray); }
+updateInfo();
 let flashText = '', flashUntil = 0;
 const flash = msg => { flashText = msg; flashUntil = performance.now() + 1400; };
 function toggleDoor(i) {
@@ -141,14 +176,19 @@ function standUp() { controls.stand(); }
 // tg: pick() 결과. allowChair: E·탭·🪑일 때만 의자에 앉음 (마우스 클릭은 스위치·문만)
 function act(tg, allowChair) {
   if (!tg) return false;
-  if (tg.type === 'switch') { if (tg.key === 'teach') toggleTeach(); else if (tg.key === 'general') toggleGeneral(); else toggle(); return true; }
+  if (tg.type === 'switch') {
+    const k = tg.key;
+    if (k === 'teach') toggleTeach(); else if (k === 'general') toggleGeneral(); else if (k === 'desk') cycleDesk(); else if (k === 'net') toggleNet(); else if (k === 'floor') toggleXray(); else toggle();
+    return true;
+  }
+  if (tg.type === 'netbox') { const n = room.net; n.doorTarget[tg.key] = 1 - n.doorTarget[tg.key]; return true; }
   if (tg.type === 'door') { toggleDoor(tg.i); return true; }
   if (tg.type === 'chair' && allowChair) { sitIn(tg.chair); return true; }
   return false;
 }
 const hintEl = document.getElementById('hint'), crossEl = document.getElementById('crosshair');
 canvas.addEventListener('mousedown', e => {
-  if (isTouch) return;
+  if (isTouch || controls.lastPointerType === 'pen') return;
   if (controls.locked) { act(pick(0, 0), false); return; }
   const r = canvas.getBoundingClientRect();
   if (!act(pick(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), false)) controls.lock();
@@ -160,6 +200,10 @@ document.addEventListener('keydown', e => {
   if (e.code === 'KeyL') toggle();
   else if (e.code === 'KeyT') toggleTeach();
   else if (e.code === 'KeyG') toggleGeneral();
+  else if (e.code === 'KeyK') cycleDesk();
+  else if (e.code === 'Digit7' || e.code === 'Digit8' || e.code === 'Digit9') setDeskWidth({ Digit7: 70, Digit8: 80, Digit9: 90 }[e.code]);
+  else if (e.code === 'KeyN') toggleNet();
+  else if (e.code === 'KeyF') toggleXray();
   else if (e.code === 'KeyE') { if (controls.seated) standUp(); else act(pick(0, 0), true); }
   else if (e.code === 'KeyC') { if (controls.seated) standUp(); else controls.toggleCrouch(); }
   else if (e.code === 'Escape' && controls.seated) standUp();
@@ -167,6 +211,9 @@ document.addEventListener('keydown', e => {
 document.getElementById('lightBtn').addEventListener('click', e => { e.stopPropagation(); toggle(); });
 document.getElementById('teachBtn').addEventListener('click', e => { e.stopPropagation(); toggleTeach(); });
 document.getElementById('genBtn').addEventListener('click', e => { e.stopPropagation(); toggleGeneral(); });
+document.getElementById('deskBtn').addEventListener('click', e => { e.stopPropagation(); cycleDesk(); });
+document.getElementById('netBtn').addEventListener('click', e => { e.stopPropagation(); toggleNet(); });
+document.getElementById('floorBtn').addEventListener('click', e => { e.stopPropagation(); toggleXray(); });
 // 🪑 버튼 (모바일): 조준한 의자에 앉기 / 일어나기. 조준한 의자가 없으면 1.3 m 안의 가장 가까운 빈 의자
 document.getElementById('seatBtn').addEventListener('click', e => {
   e.stopPropagation();
@@ -179,15 +226,15 @@ document.getElementById('seatBtn').addEventListener('click', e => {
 });
 
 const helpEl = document.getElementById('help');
-const HELP_DESK = '클릭: 시점 고정 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 빠르게 · <kbd>C</kbd> 웅크리기/서기 · 의자 조준 <kbd>E</kbd> 앉기 · 문 조준 <kbd>E</kbd>/클릭 열기·닫기 · 스위치 클릭 또는 <kbd>L</kbd> 조명 · <kbd>T</kbd> 교탁 가운데 · <kbd>G</kbd> 일반 수업 · <kbd>Esc</kbd> 해제';
-const HELP_TOUCH = '왼쪽 엄지: 이동 · 오른쪽 드래그: 둘러보기 · 문·스위치 탭 · 🪑 앉기/일어나기 · 💡 조명 · 🧑‍🏫 교탁 가운데 · 📖 일반 수업';
+const HELP_DESK = '클릭: 시점 고정 · <kbd>WASD</kbd> 이동 · <kbd>Shift</kbd> 빠르게 · <kbd>C</kbd> 웅크리기/서기 · 의자 조준 <kbd>E</kbd> 앉기 · 문 조준 <kbd>E</kbd>/클릭 열기·닫기 · 스위치 클릭 또는 <kbd>L</kbd> 조명 · <kbd>T</kbd> 교탁 가운데 · <kbd>G</kbd> 일반 수업 · <kbd>K</kbd>/<kbd>7</kbd><kbd>8</kbd><kbd>9</kbd> 책상 폭 · <kbd>N</kbd> 네트워크함 위치 · <kbd>F</kbd> 바닥 투시 · <kbd>Esc</kbd> 해제';
+const HELP_TOUCH = '왼쪽 엄지: 이동 · 오른쪽 드래그: 둘러보기 · 문·스위치 탭 · 🪑 앉기/일어나기 · 💡 조명 · 🧑‍🏫 교탁 가운데 · 📖 일반 수업 · 📏 책상 폭 · 🌐 네트워크함 위치 · 🔍 바닥 투시';
 helpEl.innerHTML = isTouch ? HELP_TOUCH : HELP_DESK;
 controls.onLockChange = locked => { helpEl.style.opacity = locked ? 0.55 : 1; if (!locked && controls.seated) standUp(); }; // Esc(시점 해제) → 일어나기
 
 // ── 캐릭터 (CC0 VRM) ──
 const loadingEl = document.getElementById('loading'), loadMsg = document.getElementById('loadMsg'), loadBar = document.getElementById('loadBar');
 const app = window.__app = { ready: false, room, scene, THREE, setMode: i => setMode(i), get mode() { return MODES[modeIdx].key; }, controls, camera, actors: [], errors: [],
-  pick: () => pick(0, 0), toggleDoor, setTeach, setGeneral, toggleTeach, toggleGeneral, teachSt, genSt, sitDesk: n => sitIn(room.chairs.find(c => c.n === n)), stand: standUp, occupied, doors: room.doors };
+  pick: () => pick(0, 0), toggleDoor, setTeach, setGeneral, toggleTeach, toggleGeneral, teachSt, genSt, deskW: DESK_W, deskURL, setDeskWidth, cycleDesk, setNet, toggleNet, setXray, toggleXray, get xray() { return xray; }, sitDesk: n => sitIn(room.chairs.find(c => c.n === n)), stand: standUp, occupied, doors: room.doors };
 let actors = [];
 loadCast(scene, room.chairs, 'assets/vrm/', (n, total, file) => {
   loadMsg.textContent = `캐릭터 불러오는 중 ${n}/${total} (${file})`;
@@ -201,8 +248,18 @@ loadCast(scene, room.chairs, 'assets/vrm/', (n, total, file) => {
   loadingEl.classList.add('hidden');
   const st = document.getElementById('start');
   document.getElementById('startHelp').innerHTML = isTouch
-    ? '· 왼쪽 엄지로 이동, 오른쪽을 드래그해 둘러보기<br>· 앞문 옆 <b>조명 스위치</b>를 탭하거나 💡 버튼: 아침 → 점심 → 저녁<br>· 그 아래 스위치 또는 🧑‍🏫: 교탁을 앞 가운데로 · 📖: 일반 수업 모드(모니터 젖히고 책)<br>· <b>문</b>을 탭하면 열고 닫기 → 복도로 나갈 수 있어요<br>· 빈 의자를 조준하고 🪑 (또는 의자 탭): 앉기 · 🪑/조이스틱: 일어나기'
-    : '· 클릭하면 마우스 시점 고정 (Esc로 해제)<br>· <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 이동, <kbd>Shift</kbd> 빠르게, <kbd>C</kbd> 웅크리기/서기<br>· 앞문 옆 <b>조명 스위치</b>를 조준해 클릭 또는 <kbd>L</kbd>: 아침 → 점심 → 저녁<br>· 그 아래 스위치: <b>교탁 가운데</b>(<kbd>T</kbd>) · <b>일반 수업</b>(<kbd>G</kbd>, 모니터를 왼쪽으로 젖히고 키보드는 서랍에, 책을 펼침)<br>· <b>문</b>을 조준하고 <kbd>E</kbd> 또는 클릭: 열기/닫기 → 복도로 나갈 수 있어요<br>· 빈 <b>의자</b>를 조준하고 <kbd>E</kbd>: 앉기 · <kbd>E</kbd>/<kbd>C</kbd>/<kbd>Esc</kbd>: 일어나기';
+    ? '· 왼쪽 엄지로 이동, 오른쪽을 드래그해 둘러보기<br>· 앞문 옆 <b>조명 스위치</b>를 탭하거나 💡 버튼: 아침 → 점심 → 저녁<br>· 그 아래 스위치 또는 🧑‍🏫: 교탁을 앞 가운데로 · 📖: 일반 수업 모드(모니터 젖히고 책)<br>· 📏 책상 폭 70·80·90 · 🌐 네트워크함 위치 · 🔍 바닥 투시<br>· <b>문</b>을 탭하면 열고 닫기 → 복도로 나갈 수 있어요<br>· 빈 의자를 조준하고 🪑 (또는 의자 탭): 앉기 · 🪑/조이스틱: 일어나기'
+    : '· 클릭하면 마우스 시점 고정 (Esc로 해제)<br>· <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / 방향키 이동, <kbd>Shift</kbd> 빠르게, <kbd>C</kbd> 웅크리기/서기<br>· 앞문 옆 <b>조명 스위치</b>를 조준해 클릭 또는 <kbd>L</kbd>: 아침 → 점심 → 저녁<br>· 그 아래 스위치: <b>교탁 가운데</b>(<kbd>T</kbd>) · <b>일반 수업</b>(<kbd>G</kbd>, 모니터를 왼쪽으로 젖히고 키보드는 서랍에, 책을 펼침)<br>· <kbd>K</kbd> 또는 <kbd>7</kbd>/<kbd>8</kbd>/<kbd>9</kbd>: 책상 폭 70·80·90 cm · <kbd>N</kbd>: 네트워크함 위치(북서 모서리 ↔ 복도 쪽 벽) · <kbd>F</kbd>: 바닥 투시(바닥 밑 LAN) · 네트워크함 조준 <kbd>E</kbd>: 문 열기<br>· <b>문</b>을 조준하고 <kbd>E</kbd> 또는 클릭: 열기/닫기 → 복도로 나갈 수 있어요<br>· 빈 <b>의자</b>를 조준하고 <kbd>E</kbd>: 앉기 · <kbd>E</kbd>/<kbd>C</kbd>/<kbd>Esc</kbd>: 일어나기';
+  { // 책상 폭 전환으로 다시 불러온 경우: 조명·교탁·일반 수업·바닥 투시·시점 복원
+    const q = new URLSearchParams(location.search);
+    if (q.has('light')) setMode(+q.get('light') || 0);
+    if (q.get('teach') === '1') setTeach(true, true);
+    if (q.get('gen') === '1') setGeneral(true, true);
+    if (q.get('xray') === '1') setXray(true);
+    const cam = (q.get('cam') || '').split(',').map(Number);
+    if (cam.length === 4 && cam.every(Number.isFinite)) controls.set(cam[0], cam[1], cam[2], cam[3]);
+    if (q.has('desk')) flash(`책상 폭 ${deskCm} cm`);
+  }
   if (!new URLSearchParams(location.search).has('nostart')) {
     st.classList.remove('hidden');
     document.getElementById('startBtn').addEventListener('click', e => { e.stopPropagation(); st.classList.add('hidden'); if (!isTouch) controls.lock(); });
@@ -221,6 +278,7 @@ renderer.setAnimationLoop(() => {
   for (const d of room.doors) {
     if (d.t !== d.target) { d.t = Math.max(0, Math.min(1, d.t + Math.sign(d.target - d.t) * dt * 1.2)); const e = d.t * d.t * (3 - 2 * d.t); d.leaf.rotation.y = d.openAngle * e; }
   }
+  for (const k of ['nw', 'e']) { const n = room.net; if (n.doorT[k] !== n.doorTarget[k]) { n.doorT[k] = Math.max(0, Math.min(1, n.doorT[k] + Math.sign(n.doorTarget[k] - n.doorT[k]) * dt * 1.5)); n.doors[k].rotation.y = -1.75 * smooth(n.doorT[k]); } }
   if (teachSt.t !== teachSt.target) { teachSt.t = Math.max(0, Math.min(1, teachSt.t + Math.sign(teachSt.target - teachSt.t) * dt * 0.5)); applyTeach(); }
   if (genSt.t !== genSt.target) { genSt.t = Math.max(0, Math.min(1, genSt.t + Math.sign(genSt.target - genSt.t) * dt * 0.8)); applyGeneral(); }
   controls.passages = room.doors.filter(d => d.t > 0.8);
@@ -233,8 +291,12 @@ renderer.setAnimationLoop(() => {
     const how = isTouch ? '탭' : 'E/클릭';
     msg = tg.key === 'teach' ? how + ': ' + (teachSt.target ? '교탁 원래 자리로' : '교탁 가운데로')
       : tg.key === 'general' ? how + ': ' + (genSt.target ? '실습실 모드로' : '일반 수업 모드로')
+      : tg.key === 'desk' ? how + `: 책상 폭 바꾸기 (지금 ${deskCm} cm → ${Math.round(DESK_WIDTHS[(DESK_WIDTHS.indexOf(DESK_W) + 1) % 3] * 100)} cm)`
+      : tg.key === 'net' ? how + ': 네트워크함 ' + (room.net.loc === 'e' ? '북서 천장 모서리로' : '복도 쪽 벽(가운데 기둥)으로')
+      : tg.key === 'floor' ? how + ': 바닥 투시 ' + (xray ? '끄기' : '켜기 (바닥 밑 LAN 배선)')
       : how + ': 조명 모드 바꾸기 (지금 ' + MODES[modeIdx].label + ')';
   }
+  else if (tg?.type === 'netbox') msg = (isTouch ? '탭 ' : 'E/클릭 ') + '네트워크함 문 ' + (room.net.doorTarget[tg.key] ? '닫기' : '열기');
   else if (tg?.type === 'door') msg = (isTouch ? '탭 ' : 'E ') + (room.doors[tg.i].target ? '닫기' : '열기');
   else if (tg?.type === 'chair') msg = tg.busy ? '자리 있음' : (isTouch ? '🪑 앉기' : 'E 앉기');
   else if (controls.seated) msg = isTouch ? '🪑 또는 조이스틱: 일어나기' : 'E · C · Esc: 일어나기';

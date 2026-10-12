@@ -2,8 +2,8 @@
 // three.js 좌표: x = X/1000, z = Y/1000, y = 높이 (1 unit = 1 m)
 export const ROOM = { W: 6.6, D: 8.4, H: 2.7 /* 천장고: 가정값 */ };
 
-// 시트 4 좌석별 좌표표 (X1, Y1, X2, Y2)
-export const DESKS = [
+// 시트 4 좌석별 좌표표 (X1, Y1, X2, Y2) — 상판 폭 700 기준 원본
+const DESKS_PLAN = [
   [1, 50, 1600, 750, 2200], [2, 1980, 1600, 2680, 2200], [3, 3920, 1600, 4620, 2200], [4, 5850, 1600, 6550, 2200],
   [5, 290, 2780, 990, 3380], [6, 1980, 2780, 2680, 3380], [7, 3920, 2780, 4620, 3380], [8, 5850, 2780, 6550, 3380],
   [9, 290, 3960, 990, 4560], [10, 1980, 3960, 2680, 4560], [11, 3920, 3960, 4620, 4560], [12, 5850, 3960, 6550, 4560],
@@ -11,7 +11,29 @@ export const DESKS = [
   [17, 50, 6320, 750, 6920], [18, 1980, 6320, 2680, 6920],
 ].map(([n, x1, y1, x2, y2]) => ({ n, x1: x1 / 1000, z1: y1 / 1000, x2: x2 / 1000, z2: y2 / 1000 }));
 
-export const RESERVE19 = { n: 19, x1: 3.92, z1: 6.32, x2: 4.62, z2: 6.92 }; // 예비 위치 (책상 없음)
+// 책상 상판 폭 변형 (t1012): 70 / 80 / 90 cm — URL ?desk=70|80|90 (벽 스위치·K 키·📏 버튼이 이 값을 바꿔 다시 불러옴). 깊이 600은 그대로.
+//   배치: 서쪽 열은 창(·서쪽 기둥) 쪽 X1 고정, 동쪽 열은 X2 6,550 고정(동쪽 기둥 45 mm 돌출과 안 겹침), 가운데 두 열은 원래 중심(X 2,330 / 4,270) 고정
+//   → 90 cm일 때 통로 최소 0.69 m(1·2열 사이), 벽·기둥·문 확보구역과 겹치지 않음
+export const DESK_WIDTHS = [0.7, 0.8, 0.9];
+const _q = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+export const DESK_W = (() => { const v = parseInt(_q.get('desk'), 10); return v === 80 ? 0.8 : v === 90 ? 0.9 : 0.7; })();
+const COLX = x1 => (x1 < 1.0 ? 0 : x1 < 3.0 ? 1 : x1 < 5.0 ? 2 : 3);
+const placeX = d => {
+  const c = COLX(d.x1), W = DESK_W;
+  if (c === 0) return [d.x1, d.x1 + W];
+  if (c === 3) return [d.x2 - W, d.x2];
+  const m = (d.x1 + d.x2) / 2; return [m - W / 2, m + W / 2];
+};
+export const DESKS = DESKS_PLAN.map(d => { const [x1, x2] = placeX(d); return { ...d, x1, x2 }; });
+
+export const RESERVE19 = (() => { const m = 4.27; return { n: 19, x1: m - DESK_W / 2, z1: 6.32, x2: m + DESK_W / 2, z2: 6.92 }; })(); // 예비 위치 (책상 없음)
+
+// 일반 수업 모드 모니터암 자세 (책상 폭마다 tools/armsolve/w.py로 탐색, 움직이는 동안에도 앞 가림판·책상 왼쪽 끝을 넘지 않음)
+//   xj: 팔꿈치 X (책상 X1 기준), A: 폴 관절, B: 팔꿈치, S: VESA 스위블 (도)
+export const ARM_POSE = { 0.7: { xj: 0.316, A: -92, B: 132, S: 40 }, 0.8: { xj: 0.34, A: -98, B: 147, S: 31 }, 0.9: { xj: 0.365, A: -96, B: 147, S: 34 } }[DESK_W];
+
+// 네트워크함 위치 (t1012): 'nw' = 앞(북)벽·서쪽 창 쪽 천장 모서리 / 'e' = 복도 쪽(동쪽) 벽 가운데 기둥 위 천장 밑. URL ?net=e
+export const NET_START = _q.get('net') === 'e' ? 'e' : 'nw';
 
 export const DESK_H = 0.74;      // 상판 H740 (가정)
 export const SEAT_ZONE = 0.58;   // 착석·기립 영역 580
