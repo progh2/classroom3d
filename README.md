@@ -58,3 +58,9 @@ python3 -m http.server 8000
 - index.html, css/, js/ (assets.js = 내장 에셋 해석, plan.js = 도면 좌표, room.js = 교실, characters.js = VRM 배치·포즈, controls.js = 이동)
 - assets/vrm/ (CC0 VRM 11개: HairSample 2 + 100Avatars 9), assets/screens/ (리눅스 실습 화면 7장), vendor/ (three.js r186, three-vrm 3.5.5)
 - CREDITS.md — 모델·라이브러리 출처와 라이선스
+
+## t1012 추가
+- 책상 폭 70/80/90 cm: 벽 스위치 '책상 폭' · `K`(순환) · `7`/`8`/`9` · 📏 버튼 · URL `?desk=80`. 폭이 바뀌면 상태를 URL에 담아 페이지를 다시 불러옴.
+- 네트워크함: 북서 천장 모서리(공유기·스위치·패치 케이블, 아크릴 문 E/클릭으로 열기). `N`/🌐/스위치 '네트워크함'으로 복도 쪽 가운데 기둥 위치로 이동(`?net=e`).
+- LAN: 모서리 덕트 → 액세스플로어 아래 → 각 자리 미니PC. `F`/🔍/스위치 '바닥 투시'로 바닥을 반투명하게.
+- 스타일러스(펜): 포인터 잠금 없이 누른 채 끌어서 둘러보기(호버는 무시).
