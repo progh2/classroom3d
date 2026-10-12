@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  ROOM, DESKS, RESERVE19, DESK_H, CHAIR, TEACHER_DESK, BOARD, TV, COLUMN, DOORS, DOOR_H,
+  ROOM, DESKS, RESERVE19, DESK_H, DESK_W, ARM_POSE, NET_START, CHAIR, TEACHER_DESK, BOARD, TV, COLUMN, DOORS, DOOR_H,
   DOOR_ZONES, WINDOWS, SILL, WIN_TOP, SWITCH_POS, EAST_GLASS, CORRIDOR, GLASSBOARDS, EAST_COLUMN, RAISE, PITS, LOCKER_SEGS, LOCKER_TOP,
 } from './plan.js';
 import * as TX from './textures.js';
@@ -73,7 +73,7 @@ export function buildRoom(scene, screenTex) {
     seat: lam('#ffffff', { map: TX.perforatedTexture() }),
     wire: new THREE.MeshLambertMaterial({ map: TX.wireMeshTexture(), alphaTest: 0.4, side: THREE.DoubleSide }),
     door: lam('#c9b08a'), doorFrame: lam('#8d7457'), column: lam('#f1efe9'), key: lam('#d8d8d8'),
-    metal: lam('#a3a8ae'), pcFace: new THREE.MeshPhongMaterial({ map: TX.miniPcFaceTexture(), shininess: 90, specular: '#666666' }), cable: lam('#1c1d20'), tie: lam('#33363b'), alu: lam('#c3c7cc'), dellBack: lam('#ffffff', { map: TX.dellLogoTexture() }), silver: lam('#d3d5d8'), glassBoard: lam('#fbfcfd', { emissive: '#1a1c1e' }), gbEdge: lam('#d5dadf'),
+    lan: lam('#2f6fd6'), metal: lam('#a3a8ae'), pcFace: new THREE.MeshPhongMaterial({ map: TX.miniPcFaceTexture(), shininess: 90, specular: '#666666' }), cable: lam('#1c1d20'), tie: lam('#33363b'), alu: lam('#c3c7cc'), dellBack: lam('#ffffff', { map: TX.dellLogoTexture() }), silver: lam('#d3d5d8'), glassBoard: lam('#fbfcfd', { emissive: '#1a1c1e' }), gbEdge: lam('#d5dadf'),
   };
 
   // ── 바닥: 액세스플로어(슬래브 +200, 600 격자) — 출입문 확보구역은 바닥판 없음(슬래브 레벨 y=-0.2) ──
@@ -86,7 +86,8 @@ export function buildRoom(scene, screenTex) {
   const fshape = new THREE.Shape(fp.map(([x, z]) => new THREE.Vector2(x, -z)));
   for (const z of PITS) if (z !== front && z !== rear) fshape.holes.push(new THREE.Path([new THREE.Vector2(z.x1, -z.z1), new THREE.Vector2(z.x1, -z.z2), new THREE.Vector2(z.x2, -z.z2), new THREE.Vector2(z.x2, -z.z1)]));
   const ftex = TX.floorTexture(); ftex.repeat.set(1 / 0.6, 1 / 0.6);
-  const floor = new THREE.Mesh(new THREE.ShapeGeometry(fshape), new THREE.MeshLambertMaterial({ map: ftex }));
+  const floorMat = new THREE.MeshLambertMaterial({ map: ftex });
+  const floor = new THREE.Mesh(new THREE.ShapeGeometry(fshape), floorMat); floor.name = 'accessFloor';
   floor.rotation.x = -Math.PI / 2; root.add(floor);
   M.slab = lam('#c9c6be'); M.nosing = lam('#b9bdc2'); M.tread = lam('#e2b23a');
   for (const z of PITS) {
@@ -121,7 +122,7 @@ export function buildRoom(scene, screenTex) {
       }
     }
   }
-  const r19 = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.6), new THREE.MeshBasicMaterial({ map: TX.dashedTexture(), transparent: true, depthWrite: false }));
+  const r19 = new THREE.Mesh(new THREE.PlaneGeometry(DESK_W, 0.6), new THREE.MeshBasicMaterial({ map: TX.dashedTexture(), transparent: true, depthWrite: false }));
   r19.rotation.x = -Math.PI / 2; r19.position.set((RESERVE19.x1 + RESERVE19.x2) / 2, 0.004, (RESERVE19.z1 + RESERVE19.z2) / 2); root.add(r19);
   bt.aabb(M.metal, RESERVE19.x1 + 0.155, RESERVE19.x1 + 0.285, 0, 0.006, RESERVE19.z1 + 0.135, RESERVE19.z1 + 0.265);
 
@@ -466,7 +467,7 @@ export function buildRoom(scene, screenTex) {
     const back = mz - 0.03;
     const vy = mY - 0.045, vx = cx - 0.045, px = cx + 0.055;
     const ax = d.x1 + 0.04, az = d.z1 + 0.035, ay = vy, vz = back - 0.09;
-    const jx = d.x1 + 0.316, jz = az;   // 팔꿈치: VESA 브래킷 바로 뒤(모니터 뒤에 숨음)
+    const jx = d.x1 + ARM_POSE.xj, jz = az;   // 팔꿈치: VESA 브래킷 바로 뒤(모니터 뒤에 숨음) — 책상 폭마다 plan.js ARM_POSE
     const sz = back - 0.062;            // VESA 스위블 축 (x = vx)
     const bA = new Batcher(vcMat), bB = new Batcher(vcMat), bC = new Batcher(vcMat);
     bC.aabb(M.black, cx - 0.3075, cx + 0.3075, mY - 0.1825, mY + 0.1825, back, mz);
@@ -515,11 +516,12 @@ export function buildRoom(scene, screenTex) {
     const offs = [[0, 0, 0], [0.006, 0.002, 0.003], [-0.002, 0.004, 0.006]];
     const off = (pts, o) => pts.map(([x, y, z]) => [x + o[0], y + o[1], z + o[2]]);
     starts.forEach((st, i) => {
-      bC.tube(M.cable, [st, ...off(pathC, offs[i])], 0.0032);
-      bB.tube(M.cable, off(pathB, offs[i]), 0.0032);
-      bA.tube(M.cable, off(pathA, offs[i]), 0.0032);
+      const cm = i === 0 ? M.lan : M.cable;   // 0번 = LAN(파란 선): 바닥 콘센트 박스 → 미니PC 옆 LAN 포트 (바닥 밑으로는 네트워크함까지)
+      bC.tube(cm, [st, ...off(pathC, offs[i])], 0.0032);
+      bB.tube(cm, off(pathB, offs[i]), 0.0032);
+      bA.tube(cm, off(pathA, offs[i]), 0.0032);
       const sp = off(pathS, offs[i]); sp[sp.length - 1] = [fx + offs[i][0] * 2, 0.012, fz + offs[i][2] * 2];
-      bt.tube(M.cable, sp, 0.0032);
+      bt.tube(cm, sp, 0.0032);
     });
     // 키보드·마우스 USB 케이블: 미니PC 옆 USB 포트 → 스위블 축·둘째 마디·첫 마디 아래(위 묶음과 함께) → 폴을 따라 내려와 → 폴 밑동(공통 이음점)
     //   → 실습실 모드: 상판 위로 키보드·마우스 뒤까지 / 일반 수업 모드: 상판 남쪽 끝으로 넘어가 늘어졌다가 바스켓 앞 테두리를 넘어 서랍 속 키보드·마우스로
@@ -578,7 +580,7 @@ export function buildRoom(scene, screenTex) {
       genB.aabb(M.plug, q - 0.02, q + 0.02, 0.453, 0.497, sz2, sz2 + 0.028);
       genB.tube(M.cable, [[q, 0.475, sz2 + 0.028], [q + 0.04, 0.42, sz2 + 0.1], [d.x2 - 0.06, 0.5, d.z1 + 0.45], [d.x2 + 0.02, 0.66, d.z1 + 0.53], [d.x2 + 0.012, DESK_H + 0.008, d.z1 + 0.53], [d.x2 - 0.03, DESK_H + 0.005, d.z1 + 0.5], [lx + 0.163, ly + 0.008, d.z1 + 0.42]], 0.003);
     } else {
-      const ry = (rnd(d.n, 1) - 0.5) * 0.24, bxc = cx + 0.095 + (rnd(d.n, 2) - 0.5) * 0.05, bzc = d.z1 + 0.40 + (rnd(d.n, 3) - 0.5) * 0.05;   // 왼쪽 가장자리의 모니터를 피해 오른쪽으로
+      const ry = (rnd(d.n, 1) - 0.5) * 0.24, bxc = d.x1 + 0.445 + (DESK_W - 0.7) * 0.6 + (rnd(d.n, 2) - 0.5) * 0.05, bzc = d.z1 + 0.40 + (rnd(d.n, 3) - 0.5) * 0.05;   // 왼쪽 가장자리의 모니터를 피해 오른쪽으로
       const B4 = T4(bxc, DESK_H, bzc, ry), W_ = 0.2, Dp = 0.27;
       genB.boxM(coverMats[d.n % coverMats.length], 2 * W_ + 0.012, 0.004, Dp + 0.012, B4.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0.002, 0)));
       for (const sgn of [-1, 1]) {   // 양쪽 페이지 묶음: 가운데(제본)로 살짝 기울어진 V자
@@ -728,6 +730,11 @@ export function buildRoom(scene, screenTex) {
   makeSwitch('light', '조명', 0, 0.16);
   makeSwitch('teach', '교탁 가운데', -0.27, 0.24);
   makeSwitch('general', '일반 수업', -0.54, 0.22);
+  makeSwitch('desk', '책상 폭', -0.81, 0.18);                     // t1012: 70 → 80 → 90 cm (다시 불러옴)
+  { const sw2 = (key, label, dy, lw) => { makeSwitch(key, label, dy, lw); const s = switches[switches.length - 1]; s.hit.parent.position.z = SWITCH_POS.z + 0.32; s.hit.scale.z = 0.7; };
+    sw2('net', '네트워크함', 0, 0.22);                             // 네트워크함 위치: 북서 천장 모서리 ↔ 복도 쪽 벽(가운데 기둥)
+    sw2('floor', '바닥 투시', -0.27, 0.2); }                       // 액세스플로어 반투명 → 바닥 밑 LAN 배선
+  const net = buildNetwork(root, M, lam, colliders);
 
   for (const [k, geos] of Object.entries(screenGeos)) {
     const m = new THREE.Mesh(mergeGeometries(geos), scrMat[k]); m.name = 'screens_' + k; root.add(m);
@@ -737,7 +744,7 @@ export function buildRoom(scene, screenTex) {
   const studentScrMats = studentScreens.map(k => scrMat[k]);
   return { root, colliders, chairs, chairHits, doors, panels, panelMat, coveMat, dlMat, skyMat, skyDay, skyNight, glassMat, corridorMats,
     switches, switchHit: switches[0].hit, switchLed: switches[0].led, lightXs, lightZs,
-    monArms, labOnly, genOnly, studentScrMats, teach: { group: teachG, col: teachCol, base: { ...teachCol }, dx: W / 2 - (TEACHER_DESK.x1 + TEACHER_DESK.x2) / 2 } };
+    monArms, labOnly, genOnly, studentScrMats, floorMat, net, teach: { group: teachG, col: teachCol, base: { ...teachCol }, dx: W / 2 - (TEACHER_DESK.x1 + TEACHER_DESK.x2) / 2 } };
 }
 
 // 옆면이 열린 책상: 다리 4개 + 상판 아래 테두리 프레임
@@ -767,4 +774,132 @@ function makeChair(bt, M, x, z) {
     bt.aabb(M.steel, x + sx * 1.05 - 0.01, x + sx * 1.05 + 0.01, 0.12, 0.14, z - 0.18, z + 0.19); // 옆 가로대
   }
   bt.aabb(M.steel, x - 0.2, x + 0.2, sh - 0.03, sh, z - 0.19, z - 0.17);
+}
+
+// ── 네트워크함(천장 밑 벽걸이 랙) + LAN 배선 (t1012) ──
+//   'nw': 앞(북)벽·서쪽 창 쪽 천장 모서리. 모서리 세로 덕트(아이보리 몰딩, 앞 덮개 반투명)로 건물 간선이 올라오고,
+//         함에서 나온 좌석 LAN 묶음이 같은 덕트로 내려가 액세스플로어 밑(슬래브 위 3 cm)으로 → 서쪽 간선(X 0.32, 기둥 동쪽)을 따라 남쪽 →
+//         줄마다 동쪽으로 갈라져 각 책상 바닥 콘센트 박스로 올라옴 → 책상 옆·폴·암을 따라 미니PC LAN 포트(파란 선)
+//   'e' : 복도 쪽(동쪽) 벽 가운데 기둥(Y3.9~4.5) 위 천장 밑. 기둥 속 매입 배관(앞 점검 덮개 반투명)으로 내려가
+//         바닥 밑 동쪽 간선(X 6.45)을 따라 남북 → 줄마다 서쪽으로 갈라져 각 책상으로
+function buildNetwork(root, M, lam, colliders) {
+  const vc = new THREE.MeshLambertMaterial({ vertexColors: true });
+  Object.assign(M, { rack: lam('#2b2e33'), rackIn: lam('#3a3e44'), duct: lam('#ece9e1'), sw: lam('#c9ccd1'), router: lam('#f2f2f0'), port: lam('#0e0f11'),
+    led: new THREE.MeshBasicMaterial({ color: '#46ff6a' }), ledA: new THREE.MeshBasicMaterial({ color: '#ffb52e' }), lanY: lam('#e8c52a'), lanG: lam('#3aa04a'), lanR: lam('#d8453a'), lanW: lam('#e9e9e6'), pedestal: lam('#9aa0a6'), slab2: lam('#b8b5ae') });
+  const acryl = new THREE.MeshLambertMaterial({ color: '#d6e8f5', transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
+  const coverMat = new THREE.MeshLambertMaterial({ color: '#efece4', transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide });
+  const UF = -0.17, H_ = ROOM.H, Y0 = 2.30, Y1 = 2.68, BW = 0.56, BD = 0.36;
+  const seats = DESKS.map(d => ({ n: d.n, fx: d.x1 + 0.2, fz: d.z1 + 0.2 }));
+  const rows = [...new Set(seats.map(s => s.fz))].sort((a, b) => a - b);
+
+  // 함 내부(로컬 좌표: x = 벽을 따라 ±BW/2, z = 벽에서 방 쪽으로 0~BD, y = 높이)
+  function cabinet(parent, label) {
+    const b = new Batcher(vc), t = 0.012, X = BW / 2;
+    b.aabb(M.rack, -X, X, Y0, Y0 + t, 0, BD); b.aabb(M.rack, -X, X, Y1 - t, Y1, 0, BD);           // 바닥·윗판
+    b.aabb(M.rack, -X, -X + t, Y0, Y1, 0, BD); b.aabb(M.rack, X - t, X, Y0, Y1, 0, BD);           // 옆판
+    b.aabb(M.rackIn, -X, X, Y0, Y1, 0, t);                                                       // 뒤판
+    for (const sx of [-0.215, 0.215]) b.aabb(M.steelDark, sx - 0.008, sx + 0.008, Y0 + t, Y1 - t, 0.27, 0.285); // 19" 레일
+    for (let i = 0; i < 4; i++) b.aabb(M.steel, -X + 0.03 + i * 0.012, -X + 0.036 + i * 0.012, Y0 + 0.03, Y1 - 0.03, 0.02, 0.022 + 0.0); // 통풍 슬롯(옆)
+    const U = 0.0445, FZ = 0.285;
+    // 위에서부터: 24포트 패치판넬 · 케이블 정리대 · 24포트 스위치 · 라우터 · 선반(ONT) · 멀티탭
+    const yPP = Y1 - t - 0.02 - U, yCM = yPP - U, ySW = yCM - U, yRT = ySW - U - 0.01, ySH = yRT - 0.06;
+    b.aabb(M.black, -0.24, 0.24, yPP, yPP + U, 0.06, FZ + 0.006);
+    b.aabb(M.dark, -0.24, 0.24, yCM + 0.008, yCM + U - 0.008, 0.2, FZ + 0.004);
+    b.aabb(M.sw, -0.215, 0.215, ySW, ySW + U, 0.05, FZ);
+    b.aabb(M.router, -0.17, 0.17, yRT, yRT + U * 0.9, 0.08, FZ - 0.01);
+    b.aabb(M.steelDark, -0.24, 0.24, ySH - 0.004, ySH, 0.04, FZ);                               // 선반
+    b.aabb(M.router, -0.2, -0.08, ySH, ySH + 0.035, 0.12, 0.25);                                 // ONT/모뎀
+    b.aabb(M.router, -0.05, 0.2, Y0 + t, Y0 + t + 0.035, 0.2, 0.27);                             // 멀티탭
+    const portX = i => -0.2 + (i % 12) * 0.0335 + (i >= 12 ? 0.008 : 0) + Math.floor(i / 12) * 0.0;
+    const portY = (y0, i) => y0 + (i < 12 ? U * 0.66 : U * 0.3);
+    for (let i = 0; i < 24; i++) {
+      b.aabb(M.port, portX(i) - 0.0065, portX(i) + 0.0065, portY(yPP, i) - 0.005, portY(yPP, i) + 0.005, FZ + 0.006, FZ + 0.0075);
+      b.aabb(M.port, portX(i) - 0.0065, portX(i) + 0.0065, portY(ySW, i) - 0.005, portY(ySW, i) + 0.005, FZ, FZ + 0.0015);
+      if (i < 21) b.aabb(i % 5 === 2 ? M.ledA : M.led, portX(i) + 0.008, portX(i) + 0.011, portY(ySW, i) + 0.006, portY(ySW, i) + 0.009, FZ, FZ + 0.002);
+    }
+    for (let i = 0; i < 4; i++) b.aabb(M.port, 0.03 + i * 0.03, 0.045 + i * 0.03, yRT + 0.012, yRT + 0.026, FZ - 0.01, FZ - 0.008);
+    b.aabb(M.led, -0.15, -0.14, yRT + 0.02, yRT + 0.026, FZ - 0.01, FZ - 0.008);
+    // 패치 코드: 패치판넬 i → 스위치 i (앞으로 둥글게), 좌석 18 + 교사 1 + TV 1 + 전자칠판 1
+    const cords = [M.lan, M.lan, M.lanY, M.lan, M.lanG];
+    for (let i = 0; i < 21; i++) {
+      const x = portX(i), p = [x, portY(yPP, i), FZ + 0.008], q = [x, portY(ySW, i), FZ + 0.002], bulge = FZ + 0.03 + (i % 3) * 0.006;
+      b.tube(i >= 18 ? M.lanW : cords[i % cords.length], [p, [x + 0.003, p[1] - 0.012, bulge], [x + 0.004, (p[1] + q[1]) / 2, bulge + 0.006], [x + 0.003, q[1] + 0.012, bulge], q], 0.0022, 4);
+    }
+    b.tube(M.lanY, [[0.2, ySW + U * 0.5, FZ], [0.23, ySW, FZ + 0.02], [0.2, yRT + 0.02, FZ + 0.01], [0.12, yRT + 0.019, FZ - 0.008]], 0.0024);   // 스위치 업링크 → 라우터
+    b.tube(M.lanG, [[-0.14, ySH + 0.02, 0.25], [-0.16, yRT + 0.01, 0.27], [0.06, yRT + 0.019, FZ - 0.008]], 0.0024);                           // ONT → 라우터 WAN
+    // 뒤쪽: 패치판넬 뒤로 들어오는 좌석 케이블 묶음 → 함 바닥 왼쪽 구멍(덕트)으로
+    for (let i = 0; i < 6; i++) b.tube(M.lan, [[-0.2 + i * 0.07, yPP + U * 0.5, 0.06], [-0.18 + i * 0.03, yPP - 0.02, 0.04], [-X + 0.06 + i * 0.006, Y0 + 0.05, 0.04 + i * 0.004], [-X + 0.06 + i * 0.006, Y0 - 0.02, 0.04 + i * 0.004]], 0.004);
+    b.tube(M.cable, [[-0.14, ySH + 0.015, 0.13], [-X + 0.05, ySH - 0.02, 0.06], [-X + 0.05, Y0 - 0.02, 0.06]], 0.005);                         // 건물 간선(광) → ONT
+    b.build(parent);
+    // 앞문: 반투명 아크릴 + 테두리, 왼쪽(−x) 경첩으로 열림 (조준 E/클릭)
+    const door = new THREE.Group(); door.position.set(-X, 0, BD); parent.add(door);
+    const db = new Batcher(vc);
+    db.aabb(M.rack, 0, BW, Y0, Y0 + 0.02, -0.006, 0.006); db.aabb(M.rack, 0, BW, Y1 - 0.02, Y1, -0.006, 0.006);
+    db.aabb(M.rack, 0, 0.02, Y0, Y1, -0.006, 0.006); db.aabb(M.rack, BW - 0.02, BW, Y0, Y1, -0.006, 0.006);
+    db.aabb(M.steel, BW - 0.05, BW - 0.035, Y0 + 0.14, Y0 + 0.24, 0.006, 0.02);                                // 손잡이
+    db.build(door);
+    const pane = new THREE.Mesh(new THREE.PlaneGeometry(BW - 0.04, Y1 - Y0 - 0.04), acryl); pane.position.set(BW / 2, (Y0 + Y1) / 2, 0); pane.renderOrder = 3; door.add(pane);
+    const lb = new THREE.Mesh(new THREE.PlaneGeometry(0.16, 0.035), new THREE.MeshBasicMaterial({ map: TX.labelTexture(label, { w: 256, h: 56, bg: '#f2f2ee', fg: '#222', font: 'bold 34px sans-serif' }) }));
+    lb.position.set(0.12, Y1 - 0.045, 0.007); door.add(lb);
+    const hit = new THREE.Mesh(new THREE.BoxGeometry(BW + 0.04, Y1 - Y0 + 0.04, BD + 0.1), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false }));
+    hit.position.set(0, (Y0 + Y1) / 2, BD / 2); hit.userData.netbox = true; parent.add(hit);
+    return { door, hit };
+  }
+  // 바닥 밑 배선 (월드 좌표): 간선 x = trunkX, 시작점 st → 줄마다 갈라져 좌석 바닥 콘센트 박스로 올라옴
+  function underfloor(b, st, trunkX) {
+    seats.forEach((s, k) => {
+      const o = (k % 6) * 0.007 - 0.018, ri = rows.indexOf(s.fz), zb = s.fz + 0.09 + (k % 4) * 0.006;
+      const pts = [st, [trunkX + o, UF + (k % 3) * 0.006, st[2] + Math.sign(zb - st[2]) * 0.12], [trunkX + o, UF + (k % 3) * 0.006, zb - Math.sign(zb - st[2]) * 0.08],
+        [trunkX + o + Math.sign(s.fx - trunkX) * 0.08, UF + (k % 3) * 0.006, zb], [s.fx - Math.sign(s.fx - trunkX) * 0.08, UF, zb], [s.fx, UF, s.fz + 0.02], [s.fx, -0.06, s.fz], [s.fx, 0.006, s.fz]];
+      b.tube(M.lan, pts, 0.004, 4);
+      void ri;
+    });
+  }
+  const groups = {}, doors = {}, hits = [];
+  // ── 북서 ──
+  { const g = new THREE.Group(); g.name = 'net_nw'; root.add(g);
+    const box = new THREE.Group(); box.position.set(0.33, 0, 0); g.add(box);
+    const c = cabinet(box, '네트워크함'); doors.nw = c.door; c.hit.userData.netbox = 'nw'; hits.push(c.hit);
+    const b = new Batcher(vc);
+    // 모서리 세로 덕트 (x 0~0.11, z 0~0.1): 옆·뒤 몰딩 + 반투명 앞 덮개, 속에 케이블 묶음
+    b.aabb(M.duct, 0.0, 0.11, 0, Y0, 0.0, 0.004); b.aabb(M.duct, 0.106, 0.11, 0, Y0, 0, 0.1); b.aabb(M.duct, 0.0, 0.004, 0, Y0, 0, 0.1);
+    for (let i = 0; i < 6; i++) b.cyl(M.lan, 0.004, Y0 + 0.19, 0.03 + (i % 3) * 0.022, (Y0 - 0.19) / 2 + 0.0, 0.035 + Math.floor(i / 3) * 0.022, 6);
+    b.cyl(M.cable, 0.005, Y0 + 0.19, 0.08, (Y0 - 0.19) / 2, 0.07, 6);
+    // 바닥 밑: 덕트 밑에서 동쪽으로 → 서쪽 간선 X 0.32 (기둥 X 0.24 동쪽) → 남쪽
+    underfloor(b, [0.06, UF, 0.06], 0.32);
+    b.build(g);
+    const cv = new THREE.Mesh(new THREE.PlaneGeometry(0.1, Y0), coverMat); cv.rotation.y = Math.PI / 2; cv.position.set(0.11, Y0 / 2, 0.05); cv.renderOrder = 3; g.add(cv);
+    const cv2 = new THREE.Mesh(new THREE.PlaneGeometry(0.11, Y0), coverMat); cv2.position.set(0.055, Y0 / 2, 0.1); cv2.renderOrder = 3; g.add(cv2);
+    groups.nw = g; g.userData.col = { x1: 0, x2: 0.11, z1: 0, z2: 0.1 };
+  }
+  // ── 동쪽 (복도 쪽 벽 가운데 기둥) ──
+  { const g = new THREE.Group(); g.name = 'net_e'; root.add(g);
+    const zc = (EAST_COLUMN.z1 + EAST_COLUMN.z2) / 2, xf = EAST_COLUMN.x1;
+    const box = new THREE.Group(); box.position.set(xf, 0, zc); box.rotation.y = -Math.PI / 2; g.add(box);
+    const c = cabinet(box, '네트워크함'); doors.e = c.door; c.hit.userData.netbox = 'e'; hits.push(c.hit);
+    const b = new Batcher(vc);
+    // 기둥 속 매입 배관: 기둥 면(x 6.555)의 점검 덮개(반투명) 뒤로 묶음이 천장 밑 함 바닥 → 슬래브까지
+    for (let i = 0; i < 6; i++) b.cyl(M.lan, 0.004, Y0 + 0.19, xf + 0.012 + (i % 2) * 0.01, (Y0 - 0.19) / 2, zc - 0.03 + Math.floor(i / 2) * 0.03, 6);
+    for (let i = 0; i < 6; i++) b.tube(M.lan, [[xf - 0.03, Y0 - 0.01, zc - 0.03 + Math.floor(i / 2) * 0.03], [xf - 0.01, Y0 - 0.05, zc - 0.03 + Math.floor(i / 2) * 0.03], [xf + 0.012 + (i % 2) * 0.01, Y0 - 0.1, zc - 0.03 + Math.floor(i / 2) * 0.03]], 0.004);
+    b.aabb(M.duct, xf - 0.004, xf, Y0 - 0.12, Y0 - 0.0, zc - 0.07, zc - 0.06); b.aabb(M.duct, xf - 0.004, xf, Y0 - 0.12, Y0, zc + 0.06, zc + 0.07);
+    underfloor(b, [xf + 0.02, UF, zc], 6.45);
+    b.build(g);
+    const cv = new THREE.Mesh(new THREE.PlaneGeometry(0.14, Y0 - 0.12), coverMat); cv.rotation.y = -Math.PI / 2; cv.position.set(xf - 0.001, (Y0 - 0.12) / 2, zc); cv.renderOrder = 3; g.add(cv);
+    groups.e = g; g.userData.col = null;
+  }
+  // 바닥 밑 (항상): 슬래브 + 받침대(600 격자) — 평소에는 불투명 바닥판에 가려지고, '바닥 투시'에서 보임
+  { const b = new Batcher(vc);
+    for (let x = 0.3; x < ROOM.W; x += 0.6) for (let z = 0.3; z < ROOM.D; z += 0.6) {
+      if (PITS.some(p => x > p.x1 - 0.05 && x < p.x2 + 0.05 && z > p.z1 - 0.05 && z < p.z2 + 0.05)) continue;
+      if (x < COLUMN.x2 + 0.03 && z > COLUMN.z1 - 0.03 && z < COLUMN.z2 + 0.03) continue;
+      b.cyl(M.pedestal, 0.012, 0.18, x, -0.11, z, 6); b.aabb(M.pedestal, x - 0.05, x + 0.05, -0.022, -0.012, z - 0.05, z + 0.05);
+    }
+    b.build(root);
+    const slab = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.W, ROOM.D), M.slab2); slab.rotation.x = -Math.PI / 2; slab.position.set(ROOM.W / 2, -RAISE - 0.002, ROOM.D / 2); root.add(slab);
+  }
+  const net = { groups, doors, hits, loc: null, doorT: { nw: 0, e: 0 }, doorTarget: { nw: 0, e: 0 },
+    set(loc) { this.loc = loc; for (const k in groups) groups[k].visible = k === loc; } };
+  net.set(NET_START);
+  if (groups.nw.userData.col) colliders.push(groups.nw.userData.col);
+  return net;
 }
